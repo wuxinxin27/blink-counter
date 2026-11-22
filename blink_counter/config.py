@@ -79,6 +79,7 @@ class AppConfig:
     inference_width: int = 360
     mirror: bool = True
     headless: bool = False
+    hide_video: bool = False
     show_overlay: bool = True
     show_graph: bool = True
     backend: str = "auto"  # "auto", "mediapipe", "haar"

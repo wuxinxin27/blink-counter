@@ -287,3 +287,51 @@ def draw_hud(
 
     _draw_text_batch(frame, text_items, use_unicode=(canvas_tr.lang != "en" and unicode_ready))
     return frame
+
+
+def draw_mini_hud(
+    analysis: FrameAnalysis,
+    wellness: WellnessSnapshot,
+    *,
+    translator: Optional[Translator] = None,
+    paused: bool = False,
+    muted: bool = False,
+    idle_mode: bool = False,
+    effective_fps: float = 15.0,
+) -> Any:
+    """Render an ultra-lightweight 440x110 status card with ZERO webcam video pixels."""
+    import numpy as np
+
+    tr = translator or Translator("en")
+    needs_unicode = tr.lang != "en"
+    unicode_ready = _can_render_unicode() if needs_unicode else False
+    canvas_tr = tr if (tr.lang == "en" or unicode_ready) else Translator("en")
+
+    w, h = 440, 112
+    card = np.full((h, w, 3), (32, 22, 18), dtype=np.uint8)
+    text_items: List[Tuple[str, Tuple[int, int], float, Tuple[int, int, int], int]] = []
+
+    bpm_color = (60, 165, 255) if wellness.dry_eye_warning else (110, 235, 175)
+    text_items.append((canvas_tr.t("rate_bpm"), (16, 24), 0.46, (150, 165, 190), 1))
+    bpm_display = f"{wellness.current_bpm:4.1f}" if analysis.face_detected else canvas_tr.t("no_face")
+    text_items.append((bpm_display, (16, 66), 1.15 if analysis.face_detected else 0.72, bpm_color, 3 if analysis.face_detected else 2))
+
+    text_items.append((canvas_tr.t("blinks"), (170, 24), 0.46, (150, 165, 190), 1))
+    text_items.append((str(analysis.total_blinks), (170, 64), 0.95, (235, 240, 248), 2))
+
+    text_items.append((canvas_tr.t("session"), (285, 24), 0.46, (150, 165, 190), 1))
+    text_items.append((format_duration(wellness.elapsed_sec), (285, 62), 0.80, (220, 228, 240), 2))
+
+    badge = (
+        canvas_tr.t("paused")
+        if paused
+        else (canvas_tr.t("idle_badge", fps=effective_fps) if idle_mode else canvas_tr.t("video_hidden_badge"))
+    )
+    text_items.append((badge, (16, 86), 0.40, (120, 235, 160), 1))
+    if muted:
+        text_items.append((canvas_tr.t("muted"), (355, 86), 0.40, (180, 195, 220), 1))
+
+    text_items.append((canvas_tr.t("mini_hotkeys"), (16, 105), 0.37, (165, 180, 205), 1))
+
+    _draw_text_batch(card, text_items, use_unicode=(canvas_tr.lang != "en" and unicode_ready))
+    return card

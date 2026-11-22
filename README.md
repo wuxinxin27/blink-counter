@@ -16,9 +16,10 @@ Includes **two ways to run** in one repository:
 ## ✨ Features
 
 - **Blink-Frequency-First Interface**: Focuses directly on what matters to users — **Live Blink Rate (BPM)**, **Total Blinks**, **Average Rate**, and a **Blink Frequency Trend Chart** with a shaded healthy zone (15–20 BPM) and automatic calibration under the hood.
-- **⚡ Eco Power-Saving Mode & Duty-Cycle Sampling**:
+- **⚡ Eco Power-Saving, Zero-Video-Render & Duty-Cycle Sampling**:
   - Caps inference to **15 FPS** (a 150–300 ms blink still spans 2–5 frames reliably).
-  - Downscales capture & inference frames (`480×270` / `280px` width) and uses `RunningMode.VIDEO` temporal tracking.
+  - **Zero-Video-Render Mode**: In the Web/PWA app, minimizing the window automatically stops ALL video, canvas, chart, and DOM rendering (`visibilitychange`) while continuing lightweight background tracking & OS alerts; you can also toggle **Hide Video Preview** manually (or press **`H`** / `--no-preview` on Desktop to switch to a 1-Hz mini status bar with zero webcam rendering).
+  - Downscales capture & inference frames (`320×180` / `240px` width in no-preview/eco mode) and uses `RunningMode.VIDEO` temporal tracking.
   - **No-Face Idle Backoff**: Automatically drops polling to **1.5 FPS** after 5 seconds when you step away.
   - **ROI-only HUD blending**: Eliminates full-frame copies when drawing overlays.
   - **Duty-Cycle Wellness Sampling (`--duty-cycle 60:240`)**: Monitors for 60 s, then **completely releases the camera hardware** for 240 s to save laptop battery.
@@ -44,7 +45,7 @@ Includes **two ways to run** in one repository:
 
 ### Option 2: Native Standalone App Installer (`.dmg` / `.exe` / Linux binary)
 
-- **macOS (Apple Silicon)**: Download **`BlinkCounter-1.3.0-macOS-arm64.dmg`** from [GitHub Releases](https://github.com/wuxinxin27/blink-counter/releases), open the `.dmg`, and drag **`Blink Counter.app`** into **Applications**.
+- **macOS (Apple Silicon)**: Download **`BlinkCounter-1.4.0-macOS-arm64.dmg`** from [GitHub Releases](https://github.com/wuxinxin27/blink-counter/releases), open the `.dmg`, and drag **`Blink Counter.app`** into **Applications**.
 - **Build a standalone app for macOS / Windows / Linux yourself** (generates `.app` + `.dmg`, `.exe`, or Linux binary with bundled icons and offline AI model):
 
 ```bash

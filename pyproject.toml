@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blink-counter"
-version = "1.3.0"
+version = "1.4.0"
 description = "Cross-platform automatic eye blink counter and eye-wellness tracker with Eco power-saving mode and multi-language support."
 readme = "README.md"
 license = { file = "LICENSE" }

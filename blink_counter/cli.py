@@ -11,7 +11,7 @@ from typing import Optional, Sequence
 from . import __version__
 from .config import AppConfig, DetectorConfig, WellnessConfig
 from .detector import BlinkDetector
-from .hud import draw_hud, format_duration
+from .hud import draw_hud, draw_mini_hud, format_duration
 from .i18n import SUPPORTED_LANGUAGES, Translator
 from .logger import SessionLogger
 from .power import PowerConfig, PowerController, parse_duty_cycle
@@ -123,6 +123,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run without opening a GUI window (lowest UI power; prints live stats to terminal).",
     )
+    parser.add_argument(
+        "--no-preview",
+        action="store_true",
+        help="Hide live webcam video rendering and show only a tiny 1-Hz status bar (ultra-low battery).",
+    )
     parser.add_argument("--no-mirror", action="store_true", help="Disable horizontal mirror flip.")
     parser.add_argument("--no-graph", action="store_true", help="Hide the EAR sparkline waveform.")
     parser.add_argument("--no-overlay", action="store_true", help="Hide eye landmark overlays.")
@@ -159,9 +164,10 @@ def build_parser() -> argparse.ArgumentParser:
 def config_from_args(args: argparse.Namespace) -> AppConfig:
     """Convert parsed CLI arguments into an :class:`AppConfig` instance."""
     eco = bool(args.eco)
-    width = args.width if args.width is not None else (480 if eco else 640)
-    height = args.height if args.height is not None else (270 if eco else 360)
-    inf_width = args.inference_width if args.inference_width is not None else (280 if eco else 360)
+    low_res_mode = eco or bool(args.headless) or bool(args.no_preview)
+    width = args.width if args.width is not None else (320 if (args.headless or args.no_preview) else (480 if eco else 640))
+    height = args.height if args.height is not None else (180 if (args.headless or args.no_preview) else (270 if eco else 360))
+    inf_width = args.inference_width if args.inference_width is not None else (240 if low_res_mode else 360)
     target_fps = args.fps if args.fps is not None else (15.0 if eco else 24.0)
     duty_on, duty_off = parse_duty_cycle(args.duty_cycle)
 
@@ -196,6 +202,7 @@ def config_from_args(args: argparse.Namespace) -> AppConfig:
         inference_width=inf_width,
         mirror=not args.no_mirror,
         headless=args.headless,
+        hide_video=bool(args.no_preview),
         show_overlay=not args.no_overlay,
         show_graph=(not args.no_graph) and (not eco),
         backend=args.backend,
@@ -250,9 +257,11 @@ def run_desktop(config: AppConfig) -> int:
     muted = not config.wellness.enable_sound
     popup_enabled = config.wellness.enable_popup
     paused = False
+    hide_video = config.hide_video
     show_graph = config.show_graph
     show_overlay = config.show_overlay
     last_terminal_print = 0.0
+    last_mini_draw = 0.0
     window_name = "Blink Counter"
     in_duty_sleep = False
 
@@ -315,12 +324,19 @@ def run_desktop(config: AppConfig) -> int:
                         logger=logger,
                         snap=last_wellness,
                         backend_name=extractor.backend_name,
-                        state={"paused": paused, "muted": muted, "show_graph": show_graph, "show_overlay": show_overlay},
+                        state={
+                            "paused": paused,
+                            "muted": muted,
+                            "hide_video": hide_video,
+                            "show_graph": show_graph,
+                            "show_overlay": show_overlay,
+                        },
                     )
                     if action == "quit":
                         break
                     paused = action["paused"]
                     muted = action["muted"]
+                    hide_video = action["hide_video"]
                     show_graph = action["show_graph"]
                     show_overlay = action["show_overlay"]
                 continue
@@ -333,7 +349,8 @@ def run_desktop(config: AppConfig) -> int:
                 print("[blink-counter] Failed to grab frame from camera.", file=sys.stderr)
                 break
 
-            if config.mirror and config.video_source is None:
+            # Skip unnecessary horizontal mirror copy when video preview is not being rendered
+            if config.mirror and config.video_source is None and not config.headless and not hide_video:
                 frame = cv2.flip(frame, 1)
 
             if not paused:
@@ -430,24 +447,39 @@ def run_desktop(config: AppConfig) -> int:
                     )
                     print(f"\r{line}   ", end="", flush=True)
             else:
-                last_annotated = draw_hud(
-                    frame,
-                    analysis,
-                    snap,
-                    translator=tr,
-                    left_eye=extraction.left_eye if extraction else None,
-                    right_eye=extraction.right_eye if extraction else None,
-                    bpm_history=wellness.bpm_history,
-                    show_overlay=show_overlay,
-                    show_graph=show_graph,
-                    paused=paused,
-                    muted=muted,
-                    eco_mode=power.eco_mode,
-                    idle_mode=idle_now,
-                    effective_fps=eff_fps,
-                    backend_name=extractor.backend_name,
-                )
-                cv2.imshow(window_name, last_annotated)
+                if hide_video:
+                    # Ultra-low-power mode: render ZERO webcam video pixels; refresh tiny card at 1 Hz
+                    if now - last_mini_draw >= 1.0 or analysis.blink_detected:
+                        last_mini_draw = now
+                        mini = draw_mini_hud(
+                            analysis,
+                            snap,
+                            translator=tr,
+                            paused=paused,
+                            muted=muted,
+                            idle_mode=idle_now,
+                            effective_fps=eff_fps,
+                        )
+                        cv2.imshow(window_name, mini)
+                else:
+                    last_annotated = draw_hud(
+                        frame,
+                        analysis,
+                        snap,
+                        translator=tr,
+                        left_eye=extraction.left_eye if extraction else None,
+                        right_eye=extraction.right_eye if extraction else None,
+                        bpm_history=wellness.bpm_history,
+                        show_overlay=show_overlay,
+                        show_graph=show_graph,
+                        paused=paused,
+                        muted=muted,
+                        eco_mode=power.eco_mode,
+                        idle_mode=idle_now,
+                        effective_fps=eff_fps,
+                        backend_name=extractor.backend_name,
+                    )
+                    cv2.imshow(window_name, last_annotated)
                 key = cv2.waitKey(1) & 0xFF
                 if key != 255:
                     action = _handle_hotkey(
@@ -460,12 +492,21 @@ def run_desktop(config: AppConfig) -> int:
                         logger=logger,
                         snap=snap,
                         backend_name=extractor.backend_name,
-                        state={"paused": paused, "muted": muted, "show_graph": show_graph, "show_overlay": show_overlay},
+                        state={
+                            "paused": paused,
+                            "muted": muted,
+                            "hide_video": hide_video,
+                            "show_graph": show_graph,
+                            "show_overlay": show_overlay,
+                        },
                     )
                     if action == "quit":
                         break
                     paused = action["paused"]
                     muted = action["muted"]
+                    if action["hide_video"] != hide_video:
+                        last_mini_draw = 0.0
+                    hide_video = action["hide_video"]
                     show_graph = action["show_graph"]
                     show_overlay = action["show_overlay"]
     except KeyboardInterrupt:
@@ -530,6 +571,8 @@ def _handle_hotkey(
         state["paused"] = not state["paused"]
     elif key in (ord("m"), ord("M")):
         state["muted"] = not state["muted"]
+    elif key in (ord("h"), ord("H")):
+        state["hide_video"] = not state["hide_video"]
     elif key in (ord("g"), ord("G")):
         state["show_graph"] = not state["show_graph"]
     elif key in (ord("o"), ord("O")):
