@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.egg-info/
+# Build & packaging artifacts
+*.spec
+*.dmg
+*.AppImage
 dist/
 build/
 .eggs/

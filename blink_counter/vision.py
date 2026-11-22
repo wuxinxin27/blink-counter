@@ -99,7 +99,13 @@ def open_video_capture(
 
 
 def ensure_face_landmarker_model(cache_dir: Optional[Path] = None) -> Path:
-    """Ensure `face_landmarker.task` is downloaded into the local cache directory."""
+    """Locate bundled `face_landmarker.task` or download it into the local cache directory."""
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        bundled = Path(meipass) / "models" / FACE_LANDMARKER_FILENAME
+        if bundled.is_file() and bundled.stat().st_size > 100_000:
+            return bundled
+
     target_dir = cache_dir or default_cache_dir()
     target_dir.mkdir(parents=True, exist_ok=True)
     model_path = target_dir / FACE_LANDMARKER_FILENAME

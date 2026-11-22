@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 from .config import AppConfig, DetectorConfig, WellnessConfig
 from .detector import BlinkDetector, BlinkEvent, CalibrationState, FrameAnalysis, compute_ear

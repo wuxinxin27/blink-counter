@@ -32,15 +32,31 @@ Includes **two ways to run** in one repository:
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Direct Local App Installation (No Python Required!)
 
-### Option A: Zero-Install Browser Web App (macOS, Linux & Windows)
+### Option 1: Install as a Desktop App Directly from Your Browser *(macOS, Windows & Linux)*
 
-Try it immediately online:
-👉 **https://wuxinxin27.github.io/blink-counter/**
+1. Open **https://wuxinxin27.github.io/blink-counter/** in Chrome or Edge.
+2. Click the green **`⬇ Install App` / `⬇ 安装到本地`** button in the top bar (or your browser's address-bar install icon).
+3. `Blink Counter` is installed directly to your Applications / Start Menu / Desktop as a standalone window — **no Python, no terminal, \$0**.
 
-Or run locally with standard Python 3 (no `pip install` needed):
+---
 
+### Option 2: Native Standalone App Installer (`.dmg` / `.exe` / Linux binary)
+
+- **macOS (Apple Silicon)**: Download **`BlinkCounter-1.2.0-macOS-arm64.dmg`** from [GitHub Releases](https://github.com/wuxinxin27/blink-counter/releases), open the `.dmg`, and drag **`Blink Counter.app`** into **Applications**.
+- **Build a standalone app for macOS / Windows / Linux yourself** (generates `.app` + `.dmg`, `.exe`, or Linux binary with bundled icons and offline AI model):
+
+```bash
+pip install -r requirements.txt pyinstaller
+python packaging/build_app.py
+```
+
+---
+
+### Option 3: Run from Source with Python (Developers)
+
+#### Zero-dependency local Web App launch:
 ```bash
 git clone https://github.com/wuxinxin27/blink-counter.git
 cd blink-counter
@@ -51,9 +67,7 @@ python3 -m blink_counter --web --lang zh
 
 *(On Windows, use `python -m blink_counter --web`.)*
 
----
-
-### Option B: Native Python Desktop App
+#### Native Python Desktop CLI:
 
 #### 1. Clone & create a virtual environment
 

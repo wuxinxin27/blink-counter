@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import http.server
 import socketserver
+import sys
 import webbrowser
 from pathlib import Path
 from typing import Optional
@@ -13,12 +14,13 @@ from .i18n import Translator
 
 
 def locate_web_dir() -> Path:
-    """Locate the bundled `web/` directory in source checkouts or installed packages."""
+    """Locate the bundled `web/` directory in PyInstaller bundles, checkouts, or packages."""
+    candidates = []
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidates.append(Path(meipass) / "web")
     package_dir = Path(__file__).resolve().parent
-    candidates = [
-        package_dir.parent / "web",
-        package_dir / "web",
-    ]
+    candidates.extend([package_dir.parent / "web", package_dir / "web"])
     for candidate in candidates:
         if (candidate / "index.html").is_file():
             return candidate
