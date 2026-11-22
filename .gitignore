@@ -10,6 +10,9 @@ __pycache__/
 dist/
 build/
 .eggs/
+desktop/node_modules/
+desktop/src-tauri/target/
+web/vendor/
 .pytest_cache/
 .coverage
 htmlcov/

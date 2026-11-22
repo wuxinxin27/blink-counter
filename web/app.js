@@ -1,16 +1,23 @@
-import {
-  FaceLandmarker,
-  FilesetResolver,
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+// Offline-first MediaPipe Tasks Vision loader (uses bundled ./vendor/ in Tauri Desktop App, falls back to CDN on Web)
+const LOCAL_VISION_MODULE = "./vendor/mediapipe/vision_bundle.mjs";
+const LOCAL_WASM_ROOT = "./vendor/mediapipe/wasm";
+const LOCAL_MODEL_URL = "./vendor/models/face_landmarker.task";
+
+const CDN_VISION_MODULE =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+const CDN_WASM_ROOT =
+  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
+const CDN_MODEL_URL =
+  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
+
+// Tauri v2 Desktop bridge (null when running in a standard browser / PWA)
+const tauriCore = window.__TAURI__?.core || null;
+const tauriEvent = window.__TAURI__?.event || null;
+const isTauriDesktop = Boolean(tauriCore);
 
 // Internal 6-point eye landmark indices used under the hood for blink detection
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
-
-const MODEL_URL =
-  "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
-const WASM_ROOT =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 
 // Sensitivity presets map friendly labels to internal detection ratios
 const SENSITIVITY_MAP = {
@@ -26,6 +33,8 @@ const I18N = {
     appTitle: "Blink Counter",
     appSubtitle: "Real-time blink frequency & eye-wellness tracker",
     installApp: "⬇ Install App",
+    minimizeTray: "📥 Hide to Tray",
+    trayTooltip: "Blink Counter · {bpm} BPM · {blinks} blinks",
     privacyBadge: "🔒 100% Local Processing",
     statusReady: "Ready",
     statusLoading: "Loading AI Model…",
@@ -127,6 +136,8 @@ const I18N = {
     appTitle: "眨眼计数器",
     appSubtitle: "实时眨眼频率监测与护眼健康助手",
     installApp: "⬇ 安装到本地",
+    minimizeTray: "📥 隐藏到托盘",
+    trayTooltip: "眨眼计数器 · {bpm} 次/分 · 累计 {blinks} 次",
     privacyBadge: "🔒 100% 本地处理",
     statusReady: "就绪",
     statusLoading: "正在加载模型…",
@@ -228,6 +239,8 @@ const I18N = {
     appTitle: "まばたきカウンター",
     appSubtitle: "リアルタイムまばたき頻度＆アイケアアシスタント",
     installApp: "⬇ アプリをインストール",
+    minimizeTray: "📥 トレイへ最小化",
+    trayTooltip: "まばたきカウンター · {bpm} 回/分 · 計 {blinks} 回",
     privacyBadge: "🔒 100% ローカル処理",
     statusReady: "準備完了",
     statusLoading: "モデル読込中…",
@@ -329,6 +342,8 @@ const I18N = {
     appTitle: "Contador de Parpadeos",
     appSubtitle: "Monitor de frecuencia de parpadeo y salud visual en tiempo real",
     installApp: "⬇ Instalar App",
+    minimizeTray: "📥 Ocultar en Bandeja",
+    trayTooltip: "Contador de Parpadeos · {bpm} PPM · {blinks} parpadeos",
     privacyBadge: "🔒 100% Procesamiento Local",
     statusReady: "Listo",
     statusLoading: "Cargando modelo…",
@@ -752,13 +767,19 @@ function requestSystemNotificationPermission() {
 
 function sendSystemNotification(title, body) {
   if (!popupToggle.checked) return;
+  if (isTauriDesktop) return; // Handled natively via Tauri surface_alert command
   if ("Notification" in window && Notification.permission === "granted") {
     try {
-      new Notification(title, {
+      const n = new Notification(title, {
         body,
         icon: "icons/icon-192.png",
+        requireInteraction: true,
         silent: false,
       });
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
     } catch {
       // Ignore browser notification restrictions
     }
@@ -773,6 +794,9 @@ function closeAlertModal() {
   activeModalKind = null;
   alertModalBackdrop.classList.add("hidden");
   alertModalCountdown.classList.add("hidden");
+  if (isTauriDesktop) {
+    tauriCore.invoke("release_always_on_top").catch(() => {});
+  }
 }
 
 function showAlertModal({ kind, title, body, countdownSec = null, autoCloseMs = 10000 }) {
@@ -806,7 +830,13 @@ function showAlertModal({ kind, title, body, countdownSec = null, autoCloseMs = 
 function triggerReminder({ kind, title, body, countdownSec = null, autoCloseMs = 10000 }) {
   playTone(kind);
   showAlertModal({ kind, title, body, countdownSec, autoCloseMs });
-  sendSystemNotification(title, body);
+  if (isTauriDesktop && popupToggle.checked) {
+    // Surface window always-on-top & send native OS notification even when minimized to tray
+    const bringToFront = kind !== "break_done";
+    tauriCore.invoke("surface_alert", { title, body, bringToFront }).catch(() => {});
+  } else {
+    sendSystemNotification(title, body);
+  }
 }
 
 function setBanner(kind, message) {
@@ -875,10 +905,25 @@ function startCalibration() {
 async function initFaceLandmarker() {
   if (faceLandmarker) return faceLandmarker;
   setStatusBadge(t("statusLoading"), "pill-warn");
-  const filesetResolver = await FilesetResolver.forVisionTasks(WASM_ROOT);
+
+  let visionModule;
+  let wasmRoot = CDN_WASM_ROOT;
+  let modelUrl = CDN_MODEL_URL;
+
+  try {
+    // Prefer bundled offline assets (inside Tauri Desktop App)
+    visionModule = await import(LOCAL_VISION_MODULE);
+    wasmRoot = LOCAL_WASM_ROOT;
+    modelUrl = LOCAL_MODEL_URL;
+  } catch {
+    visionModule = await import(CDN_VISION_MODULE);
+  }
+
+  const { FaceLandmarker, FilesetResolver } = visionModule;
+  const filesetResolver = await FilesetResolver.forVisionTasks(wasmRoot);
   faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
     baseOptions: {
-      modelAssetPath: MODEL_URL,
+      modelAssetPath: modelUrl,
       delegate: "GPU",
     },
     runningMode: "VIDEO",
@@ -1358,6 +1403,13 @@ function processFrame(nowMs, isBackground = false) {
     if (!isBackground && !document.hidden) {
       drawBpmChart();
     }
+    if (isTauriDesktop) {
+      tauriCore
+        .invoke("update_tray_tooltip", {
+          text: t("trayTooltip", { bpm: currentBpm.toFixed(1), blinks: state.totalBlinks }),
+        })
+        .catch(() => {});
+    }
   }
 
   if (!isBackground && !document.hidden) {
@@ -1549,11 +1601,26 @@ videoWrapper.classList.add("mirrored");
 applyStaticTranslations();
 drawBpmChart();
 
-// Progressive Web App (PWA) install support for macOS, Windows, and Linux
+// Progressive Web App (PWA) install support & Tauri Desktop Tray controls
 const installAppBtn = document.getElementById("installAppBtn");
+const minimizeTrayBtn = document.getElementById("minimizeTrayBtn");
 let deferredInstallPrompt = null;
 
-if ("serviceWorker" in navigator) {
+if (isTauriDesktop) {
+  if (minimizeTrayBtn) {
+    minimizeTrayBtn.classList.remove("hidden");
+    minimizeTrayBtn.addEventListener("click", () => {
+      tauriCore.invoke("minimize_to_tray").catch(() => {});
+    });
+  }
+  if (tauriEvent) {
+    tauriEvent
+      .listen("tray-start-break", () => {
+        takeBreakNowBtn.click();
+      })
+      .catch(() => {});
+  }
+} else if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   });

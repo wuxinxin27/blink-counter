@@ -12,6 +12,7 @@ from typing import Tuple
 ROOT = Path(__file__).resolve().parent.parent
 WEB_ICONS = ROOT / "web" / "icons"
 PKG_ASSETS = ROOT / "packaging" / "assets"
+TAURI_ICONS = ROOT / "desktop" / "src-tauri" / "icons"
 
 
 def _draw_icon(size: int = 1024):
@@ -101,7 +102,16 @@ def generate_all_icons() -> Tuple[Path, Path, Path]:
     if iconset_dir.exists():
         shutil.rmtree(iconset_dir)
 
-    print(f"[icons] Generated {png_1024}, {ico_path}, {icns_path}, and PWA icons in {WEB_ICONS}")
+    # Tauri v2 desktop bundle icons (macOS / Windows / Linux)
+    TAURI_ICONS.mkdir(parents=True, exist_ok=True)
+    master.resize((32, 32)).save(TAURI_ICONS / "32x32.png", format="PNG")
+    master.resize((128, 128)).save(TAURI_ICONS / "128x128.png", format="PNG")
+    master.resize((256, 256)).save(TAURI_ICONS / "128x128@2x.png", format="PNG")
+    master.resize((512, 512)).save(TAURI_ICONS / "icon.png", format="PNG")
+    shutil.copy2(ico_path, TAURI_ICONS / "icon.ico")
+    shutil.copy2(icns_path, TAURI_ICONS / "icon.icns")
+
+    print(f"[icons] Generated {png_1024}, {ico_path}, {icns_path}, PWA icons in {WEB_ICONS}, and Tauri icons in {TAURI_ICONS}")
     return png_1024, ico_path, icns_path
 
 

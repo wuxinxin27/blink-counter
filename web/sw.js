@@ -1,4 +1,4 @@
-const CACHE_NAME = "blink-counter-v1.4.0";
+const CACHE_NAME = "blink-counter-v2.0.0";
 const APP_SHELL = [
   "./",
   "./index.html",

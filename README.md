@@ -1,170 +1,88 @@
 # 👁️ Blink Counter
 
-[![Live Web App](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-0ea5e9?logo=githubpages&logoColor=white)](https://wuxinxin27.github.io/blink-counter/)
+[![Download Latest Release](https://img.shields.io/github/v/release/wuxinxin27/blink-counter?label=Download&color=10b981&logo=github)](https://github.com/wuxinxin27/blink-counter/releases/latest)
+[![Live Web / PWA](https://img.shields.io/badge/Try%20Online-Web%20%2F%20PWA-0ea5e9?logo=googlechrome&logoColor=white)](https://wuxinxin27.github.io/blink-counter/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Platforms](https://img.shields.io/badge/OS-macOS%20%7C%20Linux%20%7C%20Windows-2ea44f)](#quick-start)
+[![Platforms](https://img.shields.io/badge/OS-macOS%20%7C%20Windows%20%7C%20Linux-2ea44f)](#download--install)
 
-A **cross-platform automatic eye blink counter & eye-wellness tracker** that uses your computer's webcam to count blinks in real time, monitor blink health, prevent dry eyes and fatigue, save laptop battery with **Eco Power-Saving Mode**, and switch languages seamlessly (**English / 简体中文 / 日本語 / Español**).
+**Protect your eyes effortlessly while working at your computer.**
 
-Includes **two ways to run** in one repository:
-1. **Native Python Desktop & CLI App** (`blink_counter/`) — powered by OpenCV & MediaPipe (`RunningMode.VIDEO` tracking + OpenCV Haar fallback), supporting a clean blink-frequency HUD, live BPM trend chart, headless background tracking, Eco power-saving & duty-cycle modes, video-file analysis, and automatic CSV/JSON logging.
-2. **Zero-Install Browser Web App** (`web/`) — powered by MediaPipe Face Landmarker in WebAssembly. Runs 100% locally in Chrome, Edge, Safari, or Firefox on macOS, Linux, and Windows, and is hosted live on GitHub Pages.
+Blink Counter is a lightweight (~10–15 MB), **100% free & on-device** desktop app that tracks your blink frequency in real time, gently alerts you with unmissable pop-ups & chimes when your blink rate drops too low, and guides you through **20-20-20 far-gaze eye breaks** — all without ever uploading a single video frame.
 
 ---
 
-## ✨ Features
+## 🚀 Download & Install *(No Python or Coding Needed)*
 
-- **Blink-Frequency-First Interface**: Focuses directly on what matters to users — **Live Blink Rate (BPM)**, **Total Blinks**, **Average Rate**, and a **Blink Frequency Trend Chart** with a shaded healthy zone (15–20 BPM) and automatic calibration under the hood.
-- **⚡ Eco Power-Saving, Zero-Video-Render & Duty-Cycle Sampling**:
-  - Caps inference to **15 FPS** (a 150–300 ms blink still spans 2–5 frames reliably).
-  - **Zero-Video-Render Mode**: In the Web/PWA app, minimizing the window automatically stops ALL video, canvas, chart, and DOM rendering (`visibilitychange`) while continuing lightweight background tracking & OS alerts; you can also toggle **Hide Video Preview** manually (or press **`H`** / `--no-preview` on Desktop to switch to a 1-Hz mini status bar with zero webcam rendering).
-  - Downscales capture & inference frames (`320×180` / `240px` width in no-preview/eco mode) and uses `RunningMode.VIDEO` temporal tracking.
-  - **No-Face Idle Backoff**: Automatically drops polling to **1.5 FPS** after 5 seconds when you step away.
-  - **ROI-only HUD blending**: Eliminates full-frame copies when drawing overlays.
-  - **Duty-Cycle Wellness Sampling (`--duty-cycle 60:240`)**: Monitors for 60 s, then **completely releases the camera hardware** for 240 s to save laptop battery.
-- **🌐 Multi-Language Support (i18n)**: Switch live between **English (`en`)**, **简体中文 (`zh`)**, **日本語 (`ja`)**, and **Español (`es`)** via `--lang`, the `L` hotkey on desktop, or the top-bar dropdown in the Web App (auto-detects your OS/browser language by default).
-- **3-Second Auto-Calibration**: Automatically learns your personal open-eye baseline EAR and adapts the blink threshold.
-- **Live Blink Rate (BPM), Pop-Up Dialogs & Distinct Sound Melodies**: Tracks rolling 60-second blinks-per-minute (healthy range: 15–20 BPM) and triggers **always-on-top pop-up dialogs + OS notifications + distinct multi-note chimes** when your blink rate drops too low or when it's time for a 20-20-20 far-gaze break (press `T` on desktop or click **Test Pop-up & Sound** in the Web App to preview).
-- **Drowsiness / Prolonged Closure Detection & PERCLOS**: Distinguishes natural blinks from extended eye closure (> 1.5 s) and computes rolling **PERCLOS**.
-- **20-20-20 Eye Break Timer**: Built-in reminder every 20 minutes to look 20 feet (6 m) away for 20 seconds.
-- **Session Logging & Export**: Exports every blink event to **CSV** and full session statistics to **JSON**.
-- **Privacy-First**: All camera frames are processed **100% locally** on your machine. No images or video are ever uploaded.
+### Option 1: Lightweight Native Desktop App (Tauri — ~10–15 MB, Offline)
 
----
+Download the installer for your OS from [**GitHub Releases**](https://github.com/wuxinxin27/blink-counter/releases/latest):
 
-## 🚀 Direct Local App Installation (No Python Required!)
+| Operating System | Installer | Highlights |
+| --- | --- | --- |
+| **macOS (Apple Silicon M1–M4)** | `Blink Counter_*_aarch64.dmg` | Drag to Applications · Menu bar tray residency |
+| **macOS (Intel)** | `Blink Counter_*_x64.dmg` | Drag to Applications · Menu bar tray residency |
+| **Windows (64-bit)** | `Blink Counter_*_x64-setup.exe` / `.msi` | Standard installer · System tray residency |
+| **Linux (64-bit)** | `Blink Counter_*_amd64.AppImage` / `.deb` | Portable AppImage or Debian/Ubuntu package |
 
-### Option 1: Install as a Desktop App Directly from Your Browser *(macOS, Windows & Linux)*
+> **100% Offline & Private**: The AI vision model (`face_landmarker.task`) and WebAssembly runtime are bundled right inside the installer. Zero cloud APIs, zero accounts, \$0 forever.
+
+### Option 2: Instant Browser / PWA Install *(Zero Download)*
 
 1. Open **https://wuxinxin27.github.io/blink-counter/** in Chrome or Edge.
-2. Click the green **`⬇ Install App` / `⬇ 安装到本地`** button in the top bar (or your browser's address-bar install icon).
-3. `Blink Counter` is installed directly to your Applications / Start Menu / Desktop as a standalone window — **no Python, no terminal, \$0**.
+2. Click **`⬇ Install App` / `⬇ 安装到本地`** in the top bar to install it as a standalone desktop window.
 
 ---
 
-### Option 2: Native Standalone App Installer (`.dmg` / `.exe` / Linux binary)
+## ✨ Key Features
 
-- **macOS (Apple Silicon)**: Download **`BlinkCounter-1.4.0-macOS-arm64.dmg`** from [GitHub Releases](https://github.com/wuxinxin27/blink-counter/releases), open the `.dmg`, and drag **`Blink Counter.app`** into **Applications**.
-- **Build a standalone app for macOS / Windows / Linux yourself** (generates `.app` + `.dmg`, `.exe`, or Linux binary with bundled icons and offline AI model):
+- **Blink-Frequency-First Experience**: Clear real-time **Blink Rate (blinks/min)**, **Total Blinks**, **Average Rate**, and a **Blink Frequency Trend Chart** with a shaded healthy zone (15–20 BPM) and automatic background calibration.
+- **Unmissable Pop-Up Alerts & Multi-Note Chimes**:
+  - **Dry-Eye Reminder**: Alerts you when your blink rate stays below your threshold (default: 10 BPM).
+  - **20-20-20 Far-Gaze Break**: Reminds you every 20 minutes to look 20 ft (6 m) away for 20 seconds with a live countdown & completion chime.
+  - **Drowsiness Alert**: Warns you on prolonged eye closure.
+  - **Always-On-Top Desktop Surfacing**: In the native Tauri app, alerts surface cleanly above other apps + send native OS notifications even when tucked in the system tray.
+- **System Tray / Menu Bar Residency**: Closing the window hides Blink Counter to your menu bar / system tray so it quietly protects your eyes without cluttering your screen.
+- **Ultra-Low Battery Eco Mode**:
+  - **15 FPS inference cap** + **1.5 FPS no-face idle backoff** when you step away.
+  - **Zero-Video-Render Mode**: Automatically stops all video, canvas, chart, and DOM rendering when minimized/hidden to tray, plus a manual **Hide Video Preview** toggle.
+  - **Duty-Cycle Sampling**: Optional 60s ON / 240s camera-completely-OFF cycling for all-day battery life.
+- **Multi-Language UI (Auto-Detected)**: Switch live between **English**, **简体中文**, **日本語**, and **Español**.
+- **Session Analytics Export**: Export your blink history to **CSV** or **JSON** in one click.
 
+---
+
+## 🛠️ Automated Cross-Platform Releases (GitHub Actions)
+
+Every version tag push (`git tag v2.0.0 && git push origin v2.0.0`) or manual run of **Actions → Build & Release Cross-Platform Desktop App (Tauri)** automatically:
+1. Bundles offline MediaPipe WASM + `face_landmarker.task` via `desktop/scripts/fetch_vendor.py`.
+2. Builds signed/packaged installers in parallel for **macOS (Apple Silicon + Intel)**, **Windows x64**, and **Linux x64**.
+3. Publishes all installers to **GitHub Releases**.
+
+---
+
+## 💻 For Developers (Local Development & Python CLI)
+
+### Tauri Desktop App (Rust + Node.js)
 ```bash
-pip install -r requirements.txt pyinstaller
-python packaging/build_app.py
+cd desktop
+npm install
+python3 scripts/fetch_vendor.py
+npm run dev      # Run desktop app in development mode
+npm run build    # Build native installer for your current OS
 ```
 
----
-
-### Option 3: Run from Source with Python (Developers)
-
-#### Zero-dependency local Web App launch:
+### Python CLI & Headless / Video-File Analyzer
 ```bash
-git clone https://github.com/wuxinxin27/blink-counter.git
-cd blink-counter
+# Launch local web UI with zero pip dependencies
 python3 -m blink_counter --web
-# Open directly in Chinese / Japanese / Spanish:
-python3 -m blink_counter --web --lang zh
-```
 
-*(On Windows, use `python -m blink_counter --web`.)*
-
-#### Native Python Desktop CLI:
-
-#### 1. Clone & create a virtual environment
-
-**macOS / Linux:**
-```bash
-git clone https://github.com/wuxinxin27/blink-counter.git
-cd blink-counter
-python3 -m venv .venv
-source .venv/bin/activate
+# Run Python desktop/headless analyzer
 pip install -r requirements.txt
-```
+python3 -m blink_counter --eco --headless
+python3 -m blink_counter --source clip.mp4
 
-**Windows (PowerShell):**
-```powershell
-git clone https://github.com/wuxinxin27/blink-counter.git
-cd blink-counter
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
-
-#### 2. Run the app
-
-```bash
-# Standard desktop HUD
-python -m blink_counter
-
-# Battery-friendly Eco mode (15 FPS, low-res, idle backoff)
-python -m blink_counter --eco
-
-# Run in Simplified Chinese with Eco mode
-python -m blink_counter --eco --lang zh
-
-# Ultra-low-power headless wellness sampling (60s on, 240s camera completely off)
-python -m blink_counter --eco --headless --duty-cycle 60:240
-```
-
----
-
-## ⌨️ Interactive Hotkeys (Desktop HUD)
-
-| Key | Action |
-| --- | --- |
-| `Q` / `ESC` | Quit and save session logs |
-| `R` | Reset blink count and session timer |
-| `C` | Re-run 3-second open-eye auto-calibration |
-| `P` | Pause / Resume tracking |
-| `E` | Toggle **Eco low-power mode** (15 FPS cap) |
-| `L` | Cycle UI language (**English → 简体中文 → 日本語 → Español**) |
-| `M` | Mute / Unmute audio alerts |
-| `G` | Toggle real-time EAR waveform graph |
-| `O` | Toggle eye landmark contour overlay |
-| `S` | Save a CSV + JSON session snapshot immediately |
-
----
-
-## 🛠️ CLI Options
-
-```text
-python -m blink_counter [options]
-
-  --lang LANG            Interface language: auto | en | zh | ja | es (default: auto)
-  --web                  Launch the Browser Web App locally (zero extra dependencies)
-  --eco                  Enable Eco low-power mode (15 FPS, 480x270, idle backoff)
-  --fps FLOAT            Maximum processing FPS (default: 24, eco: 15)
-  --idle-fps FLOAT       Reduced FPS when no face is detected (default: 1.5)
-  --idle-after SEC       Seconds without a face before idle backoff (default: 5.0)
-  --duty-cycle ON:OFF    Periodic sampling in seconds (e.g. 60:240 releases camera for 240s)
-  --camera INDEX         Webcam index (default: 0)
-  --source PATH          Analyze a video file instead of a live webcam
-  --threshold FLOAT      Fixed EAR threshold (disables auto-calibration, e.g. 0.21)
-  --no-calibrate         Skip initial 3-second auto-calibration
-  --backend MODE         Vision backend: auto | mediapipe | haar (default: auto)
-  --headless             Run without opening a video window (lowest UI power)
-  --low-bpm FLOAT        Dry-eye alert threshold in BPM (default: 10.0)
-  --drowsy-seconds SEC   Continuous closure duration for drowsiness alert (default: 1.5)
-  --break-minutes MIN    20-20-20 eye break interval in minutes; 0 disables (default: 20)
-  --no-sound             Mute audible alerts
-  --no-log               Disable saving session CSV/JSON logs on exit
-  --log-dir PATH         Custom directory for session logs
-```
-
----
-
-## 💻 OS-Specific Camera Notes
-
-- **macOS**: Uses `AVFoundation` automatically. On first run, grant camera permission to your Terminal or IDE under **System Settings → Privacy & Security → Camera**.
-- **Windows**: Uses `DirectShow` (`CAP_DSHOW`) with automatic fallback. Enable camera access under **Settings → Privacy & security → Camera**.
-- **Linux**: Uses `V4L2` (`CAP_V4L2`) with automatic fallback. Ensure your user has access to `/dev/video*` (`sudo usermod -aG video $USER`).
-
----
-
-## 🧪 Running Tests
-
-```bash
-python -m unittest discover -s tests -v
+# Run cross-platform unit tests
+python3 -m unittest discover -s tests -v
 ```
 
 ---
@@ -173,25 +91,28 @@ python -m unittest discover -s tests -v
 
 ```text
 blink-counter/
-├── blink_counter/
-│   ├── cli.py          # CLI argument parser and power-aware runtime loop
-│   ├── config.py       # Dataclass configurations & OS-specific cache/log paths
-│   ├── detector.py     # EAR math, blink state machine, auto-calibration, PERCLOS
-│   ├── hud.py          # ROI-blended OpenCV HUD with Unicode/CJK font support
-│   ├── i18n.py         # Multi-language translations (en, zh, ja, es) & auto-detect
-│   ├── logger.py       # Session CSV & JSON exporter
-│   ├── power.py        # Eco FPS pacing, no-face idle backoff & duty-cycle controller
-│   ├── vision.py       # Cross-platform camera capture & MediaPipe VIDEO/Haar extractors
-│   ├── web_server.py   # Zero-dependency local HTTP server for `--web` mode
-│   └── wellness.py     # Rolling BPM, dry-eye alerts, 20-20-20 timer & audio alerts
-├── web/
-│   ├── index.html      # Zero-install Browser Web App UI (with language switcher & Eco mode)
-│   ├── styles.css      # Responsive dark theme
-│   └── app.js          # Client-side MediaPipe FaceLandmarker + Eco mode + i18n + export
-├── tests/              # Cross-platform unit tests
-├── pyproject.toml
-├── requirements.txt
-└── LICENSE
+├── desktop/                     # Tauri v2 lightweight native desktop shell (Rust)
+│   ├── package.json
+│   ├── scripts/fetch_vendor.py  # Bundles offline MediaPipe WASM & AI model at build time
+│   └── src-tauri/
+│       ├── Cargo.toml
+│       ├── tauri.conf.json
+│       ├── Info.plist           # macOS camera privacy permission description
+│       ├── capabilities/        # Tauri v2 permission scopes
+│       ├── icons/               # Multi-platform .icns / .ico / .png app icons
+│       └── src/lib.rs           # System tray, always-on-top alerts, native notifications
+├── web/                         # Shared commercial UI (used by Tauri Desktop + GitHub Pages PWA)
+│   ├── index.html
+│   ├── styles.css
+│   ├── app.js
+│   ├── manifest.json & sw.js    # PWA support
+│   └── icons/
+├── blink_counter/               # Python CLI, headless analyzer & pure-Python core engine
+├── tests/                       # Cross-platform Python unit tests
+├── packaging/                   # Icon generator & optional Python PyInstaller builder
+└── .github/workflows/
+    ├── ci.yml                   # Cross-platform Python CI (Ubuntu / macOS / Windows)
+    └── release-desktop.yml      # Automated 4-target Tauri build & GitHub Release workflow
 ```
 
 ---
