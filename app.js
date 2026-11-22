@@ -3,7 +3,7 @@ import {
   FilesetResolver,
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 
-// Canonical MediaPipe 6-point eye landmark indices for EAR calculation
+// Internal 6-point eye landmark indices used under the hood for blink detection
 const LEFT_EYE = [33, 160, 158, 133, 153, 144];
 const RIGHT_EYE = [362, 385, 387, 263, 373, 380];
 
@@ -12,12 +12,19 @@ const MODEL_URL =
 const WASM_ROOT =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm";
 
+// Sensitivity presets map friendly labels to internal detection ratios
+const SENSITIVITY_MAP = {
+  low: { ratio: 0.66, defaultThreshold: 0.19 },
+  standard: { ratio: 0.72, defaultThreshold: 0.21 },
+  high: { ratio: 0.78, defaultThreshold: 0.235 },
+};
+
 // Internationalization dictionaries (English, Simplified Chinese, Japanese, Spanish)
 const I18N = {
   en: {
     pageTitle: "Blink Counter — Cross-Platform Eye Wellness Tracker",
     appTitle: "Blink Counter",
-    appSubtitle: "Real-time webcam blink detector & eye-wellness companion",
+    appSubtitle: "Real-time blink frequency & eye-wellness tracker",
     privacyBadge: "🔒 100% Local Processing",
     statusReady: "Ready",
     statusLoading: "Loading AI Model…",
@@ -29,31 +36,36 @@ const I18N = {
     statusBreak: "Eye Break",
     statusLowBpm: "Low Blink Rate",
     statusDutySleep: "Camera Sleeping",
-    placeholderTitle: "Start Camera to Track Blinks",
-    placeholderDesc: "Runs completely inside your browser on macOS, Linux, and Windows using MediaPipe Face Landmarker. Video never leaves your device.",
+    placeholderTitle: "Start Camera to Track Blink Frequency",
+    placeholderDesc: "Runs 100% locally inside your browser on macOS, Linux, and Windows. Video never leaves your device.",
     dutySleepTitle: "Duty-Cycle Camera Sleep (Saving Power)",
     dutySleepDesc: "Camera is completely powered off for {sec}s to save battery. Monitoring will resume automatically.",
     startCamera: "Start Camera",
     stopCamera: "Stop Camera",
     pause: "Pause",
     resume: "Resume",
-    autoCalibrate: "Auto-Calibrate (3s)",
+    autoCalibrate: "Recalibrate",
     resetSession: "Reset Session",
     exportCsv: "Export CSV",
     exportJson: "Export JSON",
-    chartTitle: "Real-Time Eye Aspect Ratio (EAR)",
-    legendEar: "Smoothed EAR",
-    legendThreshold: "Blink Threshold",
+    chartTitle: "Blink Frequency Trend (Blinks / Min)",
+    legendBpm: "Blink Rate",
+    legendHealthy: "Healthy (15–20)",
+    legendAlert: "Alert (<",
+    liveBlinkRate: "Live Blink Rate",
+    healthyRange: "blinks / min (healthy: 15–20)",
+    rateHealthy: "Healthy blink frequency",
+    rateLow: "Low — remember to blink!",
+    rateWarmup: "Measuring blink frequency…",
     totalBlinks: "Total Blinks",
     waitingCamera: "Waiting for camera",
     noFace: "No face detected",
     eyesOpen: "Eyes open",
     eyesClosed: "Eyes closed",
-    liveBlinkRate: "Live Blink Rate",
-    healthyRange: "blinks / min (healthy: 15–20)",
-    currentEar: "Current EAR",
+    avgBlinkRate: "Average Rate",
+    peakBpm: "Peak: {bpm} BPM",
     sessionTime: "Session Time",
-    avgBpm: "Avg: {bpm} BPM",
+    breaksSummary: "Breaks taken: {count}",
     powerTitle: "⚡ Power Saver (Eco Mode)",
     powerHint: "Caps inference to 15 FPS, uses 480×270 video, and drops to 1.5 FPS when you step away.",
     idleBackoffLabel: "No-face idle backoff (1.5 FPS)",
@@ -69,34 +81,38 @@ const I18N = {
     breakCompleted: "Completed breaks: {count}",
     breakOff: "OFF",
     startBreakNow: "Start 20s Break",
-    settingsTitle: "Detection & Alerts",
-    earThresholdLabel: "EAR Threshold",
+    settingsTitle: "Blink Alerts & Preferences",
     lowBpmLabel: "Dry-Eye Alert Below (BPM)",
     drowsyLabel: "Drowsiness Closure (sec)",
+    sensitivityLabel: "Blink Sensitivity",
+    sensLow: "Low",
+    sensStandard: "Standard",
+    sensHigh: "High",
     soundAlerts: "Sound alerts",
-    eyeLandmarks: "Eye landmarks",
+    eyeLandmarks: "Eye tracking lines",
     mirrorVideo: "Mirror video",
     recentBlinks: "Recent Blinks",
-    eventsCount: "{count} events",
+    eventsCount: "{count} blinks",
     colTime: "Time",
     colDuration: "Duration",
-    colMinEar: "Min EAR",
+    colRate: "Blink Rate",
     noBlinksYet: "No blinks recorded yet.",
     footerLeft: "Blink Counter · Open-Source Cross-Platform Project (macOS, Linux & Windows)",
-    footerRight: "Powered by MediaPipe Face Landmarker & Eye Aspect Ratio (EAR)",
-    bannerCalibrating: "Calibrating open-eye baseline... look naturally at the screen ({pct}%)",
+    footerRight: "100% Free & Local Blink Frequency & Eye-Wellness Tracking",
+    bannerCalibrating: "Calibrating automatically... look naturally at the screen ({pct}%)",
     bannerDrowsy: "DROWSINESS ALERT — Eyes closed for {sec}s!",
     bannerBreak: "20-20-20 EYE BREAK — Look 20 ft (6 m) away for {sec}s",
     bannerDryEye: "Low blink rate ({bpm} BPM) — Remember to blink to prevent dry eyes!",
     bannerCameraError: "Could not start camera or model: {err}",
+    bpmUnit: "{bpm} BPM",
   },
   zh: {
-    pageTitle: "眨眼计数器 — 跨平台护眼健康助手",
+    pageTitle: "眨眼计数器 — 跨平台护眼频率监测助手",
     appTitle: "眨眼计数器",
-    appSubtitle: "基于摄像头的实时眨眼监测与护眼健康助手",
+    appSubtitle: "实时眨眼频率监测与护眼健康助手",
     privacyBadge: "🔒 100% 本地处理",
     statusReady: "就绪",
-    statusLoading: "正在加载 AI 模型…",
+    statusLoading: "正在加载模型…",
     statusLive: "实时监测中",
     statusPaused: "已暂停",
     statusStopped: "已停止",
@@ -105,31 +121,36 @@ const I18N = {
     statusBreak: "护眼休息",
     statusLowBpm: "眨眼偏少",
     statusDutySleep: "摄像头休眠",
-    placeholderTitle: "开启摄像头开始监测眨眼",
-    placeholderDesc: "在 macOS、Linux 和 Windows 浏览器内 100% 本地运行（MediaPipe 人脸关键点），视频画面绝不上传。",
+    placeholderTitle: "开启摄像头开始监测眨眼频率",
+    placeholderDesc: "在 macOS、Linux 和 Windows 浏览器内 100% 本地运行，视频画面绝不上传。",
     dutySleepTitle: "省电采样休眠中（已关闭摄像头）",
-    dutySleepDesc: "已完全释放摄像头传感器以节省电量，将在 {sec} 秒后自动恢复监测。",
+    dutySleepDesc: "已完全关闭摄像头以节省电量，将在 {sec} 秒后自动恢复监测。",
     startCamera: "开启摄像头",
     stopCamera: "关闭摄像头",
     pause: "暂停",
     resume: "继续",
-    autoCalibrate: "自动校准 (3秒)",
+    autoCalibrate: "重新校准",
     resetSession: "重置会话",
     exportCsv: "导出 CSV",
     exportJson: "导出 JSON",
-    chartTitle: "实时眼部纵横比 (EAR) 波形",
-    legendEar: "平滑 EAR",
-    legendThreshold: "眨眼阈值",
+    chartTitle: "眨眼频率趋势（次/分钟）",
+    legendBpm: "实时频率",
+    legendHealthy: "健康区间 (15–20)",
+    legendAlert: "偏低提醒 (<",
+    liveBlinkRate: "实时眨眼频率",
+    healthyRange: "次/分钟（健康参考：15–20）",
+    rateHealthy: "眨眼频率健康",
+    rateLow: "频率偏低，记得多眨眼！",
+    rateWarmup: "正在计算眨眼频率…",
     totalBlinks: "累计眨眼次数",
     waitingCamera: "等待开启摄像头",
     noFace: "未检测到人脸",
-    eyesOpen: "睁眼状态",
-    eyesClosed: "闭眼状态",
-    liveBlinkRate: "实时眨眼频率",
-    healthyRange: "次/分钟（健康参考：15–20）",
-    currentEar: "当前 EAR",
+    eyesOpen: "睁眼",
+    eyesClosed: "闭眼",
+    avgBlinkRate: "平均眨眼频率",
+    peakBpm: "峰值：{bpm} 次/分",
     sessionTime: "监测时长",
-    avgBpm: "平均：{bpm} 次/分",
+    breaksSummary: "已完成休息：{count} 次",
     powerTitle: "⚡ 省电模式 (Eco Mode)",
     powerHint: "推理限帧 15 FPS、低清 480×270 采集，离开座位时自动降至 1.5 FPS。",
     idleBackoffLabel: "无人脸自动降频 (1.5 FPS)",
@@ -145,34 +166,38 @@ const I18N = {
     breakCompleted: "已完成休息：{count} 次",
     breakOff: "已关闭",
     startBreakNow: "立即休息 20 秒",
-    settingsTitle: "检测参数与提醒",
-    earThresholdLabel: "EAR 判定阈值",
-    lowBpmLabel: "眼干提醒阈值 (次/分)",
-    drowsyLabel: "疲劳闭眼时长 (秒)",
+    settingsTitle: "提醒与灵敏度设置",
+    lowBpmLabel: "眼干提醒阈值（次/分）",
+    drowsyLabel: "疲劳闭眼时长（秒）",
+    sensitivityLabel: "眨眼检测灵敏度",
+    sensLow: "低",
+    sensStandard: "标准",
+    sensHigh: "高",
     soundAlerts: "提示音",
-    eyeLandmarks: "眼部关键点",
+    eyeLandmarks: "眼部轮廓线",
     mirrorVideo: "镜像画面",
     recentBlinks: "最近眨眼记录",
     eventsCount: "共 {count} 次",
     colTime: "时间",
     colDuration: "持续时长",
-    colMinEar: "最小 EAR",
+    colRate: "当时频率",
     noBlinksYet: "暂无眨眼记录。",
     footerLeft: "Blink Counter · 开源跨平台护眼项目（支持 macOS / Linux / Windows）",
-    footerRight: "基于 MediaPipe Face Landmarker 与眼部纵横比 (EAR) 算法",
-    bannerCalibrating: "正在校准睁眼基准值…请自然注视屏幕 ({pct}%)",
+    footerRight: "100% 免费本地运行的眨眼频率与护眼助手",
+    bannerCalibrating: "正在自动校准…请自然注视屏幕 ({pct}%)",
     bannerDrowsy: "疲劳预警 — 闭眼已持续 {sec} 秒！",
     bannerBreak: "20-20-20 护眼休息 — 请远眺 6 米外景物 {sec} 秒",
     bannerDryEye: "眨眼频率偏低 ({bpm} 次/分) — 记得多眨眼，预防眼干！",
     bannerCameraError: "无法启动摄像头或模型：{err}",
+    bpmUnit: "{bpm} 次/分",
   },
   ja: {
-    pageTitle: "まばたきカウンター — クロスプラットフォーム目の健康トラッカー",
+    pageTitle: "まばたきカウンター — 目の健康トラッカー",
     appTitle: "まばたきカウンター",
-    appSubtitle: "リアルタイムWebカメラまばたき計測＆アイケアアシスタント",
+    appSubtitle: "リアルタイムまばたき頻度＆アイケアアシスタント",
     privacyBadge: "🔒 100% ローカル処理",
     statusReady: "準備完了",
-    statusLoading: "AIモデル読込中…",
+    statusLoading: "モデル読込中…",
     statusLive: "計測中",
     statusPaused: "一時停止",
     statusStopped: "停止",
@@ -181,31 +206,36 @@ const I18N = {
     statusBreak: "目の休憩",
     statusLowBpm: "まばたき減少",
     statusDutySleep: "カメラスリープ",
-    placeholderTitle: "カメラを開始してまばたきを計測",
-    placeholderDesc: "macOS・Linux・Windowsのブラウザ内で完結動作（MediaPipe）。映像は外部へ送信されません。",
+    placeholderTitle: "カメラを開始してまばたき頻度を計測",
+    placeholderDesc: "macOS・Linux・Windowsのブラウザ内で100%ローカル動作。映像は外部送信されません。",
     dutySleepTitle: "省電力カメラスリープ中",
     dutySleepDesc: "バッテリー節約のためカメラを停止しています。{sec} 秒後に自動再開します。",
     startCamera: "カメラ開始",
     stopCamera: "カメラ停止",
     pause: "一時停止",
     resume: "再開",
-    autoCalibrate: "自動校正 (3秒)",
+    autoCalibrate: "再調整",
     resetSession: "リセット",
     exportCsv: "CSV出力",
     exportJson: "JSON出力",
-    chartTitle: "リアルタイム EAR（目の縦横比）波形",
-    legendEar: "平滑化 EAR",
-    legendThreshold: "しきい値",
+    chartTitle: "まばたき頻度の推移（回 / 分）",
+    legendBpm: "まばたき頻度",
+    legendHealthy: "健康目安 (15–20)",
+    legendAlert: "警告 (<",
+    liveBlinkRate: "現在のまばたき頻度",
+    healthyRange: "回 / 分（健康目安：15–20）",
+    rateHealthy: "健康的なペースです",
+    rateLow: "減少中 — 意識してまばたきを！",
+    rateWarmup: "頻度を計測しています…",
     totalBlinks: "合計まばたき数",
     waitingCamera: "カメラ待機中",
     noFace: "顔が検出されません",
     eyesOpen: "開眼",
     eyesClosed: "閉眼",
-    liveBlinkRate: "まばたき頻度",
-    healthyRange: "回 / 分（目安：15–20）",
-    currentEar: "現在の EAR",
+    avgBlinkRate: "平均頻度",
+    peakBpm: "最大: {bpm} 回/分",
     sessionTime: "計測時間",
-    avgBpm: "平均: {bpm} BPM",
+    breaksSummary: "休憩回数: {count} 回",
     powerTitle: "⚡ 省電力モード (Eco Mode)",
     powerHint: "推論を15 FPSに制限し、480×270映像と離席時の1.5 FPS待機で消費電力を削減。",
     idleBackoffLabel: "顔未検出時の自動省電力 (1.5 FPS)",
@@ -221,34 +251,38 @@ const I18N = {
     breakCompleted: "完了した休憩: {count} 回",
     breakOff: "OFF",
     startBreakNow: "今すぐ20秒休憩",
-    settingsTitle: "検出設定＆アラート",
-    earThresholdLabel: "EAR しきい値",
-    lowBpmLabel: "ドライアイ警告 (BPM以下)",
-    drowsyLabel: "眠気判定の閉眼時間 (秒)",
+    settingsTitle: "アラート＆感度設定",
+    lowBpmLabel: "ドライアイ警告（回/分以下）",
+    drowsyLabel: "眠気判定の閉眼時間（秒）",
+    sensitivityLabel: "検出感度",
+    sensLow: "低",
+    sensStandard: "標準",
+    sensHigh: "高",
     soundAlerts: "音声アラート",
-    eyeLandmarks: "目のランドマーク",
+    eyeLandmarks: "目のトラッキング線",
     mirrorVideo: "左右反転",
     recentBlinks: "最近のまばたき",
-    eventsCount: "{count} 件",
+    eventsCount: "{count} 回",
     colTime: "時刻",
     colDuration: "長さ",
-    colMinEar: "最小 EAR",
+    colRate: "頻度",
     noBlinksYet: "まだ記録がありません。",
     footerLeft: "Blink Counter · オープンソース（macOS / Linux / Windows対応）",
-    footerRight: "MediaPipe Face Landmarker & EAR アルゴリズム搭載",
-    bannerCalibrating: "基準値を自動校正中…画面を自然に見てください ({pct}%)",
+    footerRight: "完全無料・ローカル動作のまばたき頻度トラッカー",
+    bannerCalibrating: "自動調整中…画面を自然に見てください ({pct}%)",
     bannerDrowsy: "眠気警告 — {sec} 秒間目が閉じています！",
     bannerBreak: "20-20-20 目の休憩 — 6m先を {sec} 秒間眺めてください",
-    bannerDryEye: "まばたき減少 ({bpm} BPM) — ドライアイ予防のためまばたきを意識しましょう！",
+    bannerDryEye: "まばたき減少 ({bpm} 回/分) — ドライアイ予防のためまばたきを意識しましょう！",
     bannerCameraError: "カメラまたはモデルの起動に失敗しました: {err}",
+    bpmUnit: "{bpm} 回/分",
   },
   es: {
     pageTitle: "Contador de Parpadeos — Salud Visual Multiplataforma",
     appTitle: "Contador de Parpadeos",
-    appSubtitle: "Detector de parpadeos por cámara web y asistente de salud visual",
+    appSubtitle: "Monitor de frecuencia de parpadeo y salud visual en tiempo real",
     privacyBadge: "🔒 100% Procesamiento Local",
     statusReady: "Listo",
-    statusLoading: "Cargando modelo IA…",
+    statusLoading: "Cargando modelo…",
     statusLive: "Rastreo Activo",
     statusPaused: "Pausado",
     statusStopped: "Detenido",
@@ -257,31 +291,36 @@ const I18N = {
     statusBreak: "Pausa Visual",
     statusLowBpm: "Parpadeo Bajo",
     statusDutySleep: "Cámara en Reposo",
-    placeholderTitle: "Inicia la Cámara para Contar Parpadeos",
-    placeholderDesc: "Funciona localmente en tu navegador en macOS, Linux y Windows con MediaPipe. El video nunca sale de tu equipo.",
+    placeholderTitle: "Inicia la Cámara para Medir tu Frecuencia",
+    placeholderDesc: "Funciona 100% localmente en tu navegador en macOS, Linux y Windows. El video nunca sale de tu equipo.",
     dutySleepTitle: "Reposo de Cámara (Ahorro de Energía)",
     dutySleepDesc: "La cámara está completamente apagada por {sec}s para ahorrar batería. Se reanudará automáticamente.",
     startCamera: "Iniciar Cámara",
     stopCamera: "Detener Cámara",
     pause: "Pausar",
     resume: "Reanudar",
-    autoCalibrate: "Autocalibrar (3s)",
+    autoCalibrate: "Recalibrar",
     resetSession: "Reiniciar Sesión",
     exportCsv: "Exportar CSV",
     exportJson: "Exportar JSON",
-    chartTitle: "Relación de Aspecto Ocular (EAR) en Tiempo Real",
-    legendEar: "EAR Suavizado",
-    legendThreshold: "Umbral",
+    chartTitle: "Tendencia de Frecuencia de Parpadeo (PPM)",
+    legendBpm: "Ritmo",
+    legendHealthy: "Saludable (15–20)",
+    legendAlert: "Alerta (<",
+    liveBlinkRate: "Frecuencia Actual",
+    healthyRange: "parpadeos / min (normal: 15–20)",
+    rateHealthy: "Frecuencia saludable",
+    rateLow: "Baja — ¡recuerda parpadear!",
+    rateWarmup: "Calculando frecuencia…",
     totalBlinks: "Total de Parpadeos",
     waitingCamera: "Esperando cámara",
     noFace: "Sin rostro detectado",
     eyesOpen: "Ojos abiertos",
     eyesClosed: "Ojos cerrados",
-    liveBlinkRate: "Ritmo Actual",
-    healthyRange: "parpadeos / min (normal: 15–20)",
-    currentEar: "EAR Actual",
+    avgBlinkRate: "Ritmo Promedio",
+    peakBpm: "Máximo: {bpm} PPM",
     sessionTime: "Duración",
-    avgBpm: "Prom: {bpm} PPM",
+    breaksSummary: "Pausas: {count}",
     powerTitle: "⚡ Ahorro de Energía (Modo Eco)",
     powerHint: "Limita la inferencia a 15 FPS, usa video 480×270 y baja a 1.5 FPS si te alejas.",
     idleBackoffLabel: "Modo inactivo sin rostro (1.5 FPS)",
@@ -297,26 +336,30 @@ const I18N = {
     breakCompleted: "Pausas completadas: {count}",
     breakOff: "OFF",
     startBreakNow: "Pausa de 20s",
-    settingsTitle: "Detección y Alertas",
-    earThresholdLabel: "Umbral EAR",
+    settingsTitle: "Alertas y Preferencias",
     lowBpmLabel: "Alerta de Ojo Seco (< PPM)",
     drowsyLabel: "Cierre por Somnolencia (seg)",
+    sensitivityLabel: "Sensibilidad",
+    sensLow: "Baja",
+    sensStandard: "Estándar",
+    sensHigh: "Alta",
     soundAlerts: "Sonido",
-    eyeLandmarks: "Puntos oculares",
+    eyeLandmarks: "Líneas oculares",
     mirrorVideo: "Espejo",
     recentBlinks: "Parpadeos Recientes",
-    eventsCount: "{count} eventos",
+    eventsCount: "{count} parpadeos",
     colTime: "Hora",
     colDuration: "Duración",
-    colMinEar: "EAR Mín",
+    colRate: "Frecuencia",
     noBlinksYet: "Sin parpadeos registrados aún.",
     footerLeft: "Blink Counter · Proyecto Open-Source Multiplataforma (macOS, Linux y Windows)",
-    footerRight: "Impulsado por MediaPipe Face Landmarker y EAR",
-    bannerCalibrating: "Calibrando ojos abiertos... mire la pantalla naturalmente ({pct}%)",
+    footerRight: "Seguimiento 100% gratuito y local de frecuencia de parpadeo",
+    bannerCalibrating: "Calibrando automáticamente... mire la pantalla naturalmente ({pct}%)",
     bannerDrowsy: "¡ALERTA DE SOMNOLENCIA — Ojos cerrados por {sec}s!",
     bannerBreak: "PAUSA 20-20-20 — Mire a 6 metros de distancia por {sec}s",
     bannerDryEye: "Ritmo de parpadeo bajo ({bpm} PPM) — ¡Recuerde parpadear para evitar ojos secos!",
     bannerCameraError: "No se pudo iniciar la cámara o el modelo: {err}",
+    bpmUnit: "{bpm} PPM",
   },
 };
 
@@ -351,8 +394,8 @@ const videoWrapper = document.querySelector(".video-wrapper");
 const placeholderEl = document.getElementById("cameraPlaceholder");
 const placeholderTitle = document.getElementById("placeholderTitle");
 const placeholderDesc = document.getElementById("placeholderDesc");
-const earChartCanvas = document.getElementById("earChart");
-const earChartCtx = earChartCanvas.getContext("2d");
+const bpmChartCanvas = document.getElementById("bpmChart");
+const bpmChartCtx = bpmChartCanvas.getContext("2d");
 
 const statusBadge = document.getElementById("statusBadge");
 const alertBanner = document.getElementById("alertBanner");
@@ -365,13 +408,14 @@ const exportCsvBtn = document.getElementById("exportCsvBtn");
 const exportJsonBtn = document.getElementById("exportJsonBtn");
 const takeBreakNowBtn = document.getElementById("takeBreakNowBtn");
 
+const bpmValue = document.getElementById("bpmValue");
+const rateHealthText = document.getElementById("rateHealthText");
 const totalBlinksValue = document.getElementById("totalBlinksValue");
 const eyeStateText = document.getElementById("eyeStateText");
-const bpmValue = document.getElementById("bpmValue");
-const earValue = document.getElementById("earValue");
-const perclosText = document.getElementById("perclosText");
+const avgBpmValue = document.getElementById("avgBpmValue");
+const peakBpmText = document.getElementById("peakBpmText");
 const sessionTimeValue = document.getElementById("sessionTimeValue");
-const avgBpmText = document.getElementById("avgBpmText");
+const breaksSummaryText = document.getElementById("breaksSummaryText");
 const breakTimerValue = document.getElementById("breakTimerValue");
 const breakHint = document.getElementById("breakHint");
 const blinkLogBody = document.getElementById("blinkLogBody");
@@ -380,13 +424,12 @@ const logCountBadge = document.getElementById("logCountBadge");
 const ecoToggle = document.getElementById("ecoToggle");
 const idleBackoffToggle = document.getElementById("idleBackoffToggle");
 const dutyCycleToggle = document.getElementById("dutyCycleToggle");
-const thresholdSlider = document.getElementById("thresholdSlider");
-const thresholdReadout = document.getElementById("thresholdReadout");
-const legendThreshold = document.getElementById("legendThreshold");
 const lowBpmSlider = document.getElementById("lowBpmSlider");
 const lowBpmReadout = document.getElementById("lowBpmReadout");
+const legendLowBpm = document.getElementById("legendLowBpm");
 const drowsySlider = document.getElementById("drowsySlider");
 const drowsyReadout = document.getElementById("drowsyReadout");
+const sensitivitySelect = document.getElementById("sensitivitySelect");
 const soundToggle = document.getElementById("soundToggle");
 const overlayToggle = document.getElementById("overlayToggle");
 const mirrorToggle = document.getElementById("mirrorToggle");
@@ -412,14 +455,14 @@ const state = {
   drowsyEvents: 0,
   dryEyeAlerts: 0,
   breaksCompleted: 0,
-  earThreshold: 0.21,
+  baselineOpenRatio: null,
+  internalThreshold: SENSITIVITY_MAP.standard.defaultThreshold,
   hysteresis: 0.02,
   smoothingAlpha: 0.45,
-  smoothedEar: null,
+  smoothedSignal: null,
   eyesClosed: false,
   closedFrames: 0,
   closureStartMs: null,
-  closureMinEar: 1.0,
   lastBlinkMs: null,
   drowsyTriggeredForClosure: false,
   lastDryEyeAlertMs: null,
@@ -428,11 +471,9 @@ const state = {
   calibrationSamples: [],
   blinkTimestamps: [],
   blinkRecords: [],
-  earHistory: [],
-  perclosSamples: [],
-  lastFrameMs: null,
+  bpmHistory: [],
+  lastBpmSampleMs: 0,
   lastInferMs: 0,
-  lastChartDrawMs: 0,
   lastFaceMs: null,
   dutyPhaseStartMs: null,
   maxBpm: 0,
@@ -451,28 +492,40 @@ function applyStaticTranslations() {
   toggleCameraBtn.textContent = running ? t("stopCamera") : t("startCamera");
   pauseBtn.textContent = paused ? t("resume") : t("pause");
   logCountBadge.textContent = t("eventsCount", { count: state.blinkRecords.length });
+  peakBpmText.textContent = t("peakBpm", { bpm: state.maxBpm.toFixed(1) });
+  breaksSummaryText.textContent = t("breaksSummary", { count: state.breaksCompleted });
   if (!running) {
     setStatusBadge(t("statusReady"), "pill-idle");
     eyeStateText.textContent = t("waitingCamera");
-    avgBpmText.textContent = t("avgBpm", { bpm: "0.0" });
+    rateHealthText.textContent = t("healthyRange");
   }
   updatePowerBadge(performance.now());
+  drawBpmChart();
 }
 
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
-function computeEar(landmarks, indices, width, height) {
+function computeEyeOpenness(landmarks, indices, width, height) {
   const pts = indices.map((i) => ({
     x: landmarks[i].x * width,
     y: landmarks[i].y * height,
   }));
   const horiz = dist(pts[0], pts[3]);
-  if (horiz <= 1e-6) return { ear: 0, pts };
+  if (horiz <= 1e-6) return { ratio: 0, pts };
   const v1 = dist(pts[1], pts[5]);
   const v2 = dist(pts[2], pts[4]);
-  return { ear: (v1 + v2) / (2 * horiz), pts };
+  return { ratio: (v1 + v2) / (2 * horiz), pts };
+}
+
+function applySensitivity() {
+  const preset = SENSITIVITY_MAP[sensitivitySelect.value] || SENSITIVITY_MAP.standard;
+  if (state.baselineOpenRatio !== null) {
+    state.internalThreshold = Math.max(0.14, Math.min(0.28, state.baselineOpenRatio * preset.ratio));
+  } else {
+    state.internalThreshold = preset.defaultThreshold;
+  }
 }
 
 function formatDuration(sec) {
@@ -557,13 +610,6 @@ function setStatusBadge(label, cls) {
   statusBadge.className = `pill ${cls}`;
 }
 
-function updateThresholdUI(val) {
-  state.earThreshold = val;
-  thresholdSlider.value = val.toFixed(3);
-  thresholdReadout.textContent = val.toFixed(2);
-  legendThreshold.textContent = val.toFixed(2);
-}
-
 function resetSession(keepCalibration = true) {
   const now = performance.now();
   state.sessionStartMs = running ? now : null;
@@ -571,19 +617,17 @@ function resetSession(keepCalibration = true) {
   state.drowsyEvents = 0;
   state.dryEyeAlerts = 0;
   state.breaksCompleted = 0;
-  state.smoothedEar = null;
+  state.smoothedSignal = null;
   state.eyesClosed = false;
   state.closedFrames = 0;
   state.closureStartMs = null;
-  state.closureMinEar = 1.0;
   state.lastBlinkMs = null;
   state.drowsyTriggeredForClosure = false;
   state.lastDryEyeAlertMs = null;
   state.blinkTimestamps = [];
   state.blinkRecords = [];
-  state.earHistory = [];
-  state.perclosSamples = [];
-  state.lastFrameMs = null;
+  state.bpmHistory = [];
+  state.lastBpmSampleMs = 0;
   state.maxBpm = 0;
   state.inBreak = false;
   state.breakEndMs = null;
@@ -593,17 +637,18 @@ function resetSession(keepCalibration = true) {
     state.calibrationSamples = [];
   }
 
-  totalBlinksValue.textContent = "0";
   bpmValue.textContent = "0.0";
-  earValue.textContent = "0.000";
-  perclosText.textContent = "PERCLOS: 0.0%";
+  rateHealthText.textContent = t("healthyRange");
+  totalBlinksValue.textContent = "0";
+  avgBpmValue.textContent = "0.0";
+  peakBpmText.textContent = t("peakBpm", { bpm: "0.0" });
   sessionTimeValue.textContent = "00:00";
-  avgBpmText.textContent = t("avgBpm", { bpm: "0.0" });
+  breaksSummaryText.textContent = t("breaksSummary", { count: 0 });
   breakTimerValue.textContent = "20:00";
   logCountBadge.textContent = t("eventsCount", { count: 0 });
   blinkLogBody.innerHTML = `<tr><td colspan="4" class="empty-row">${t("noBlinksYet")}</td></tr>`;
   setBanner(null, "");
-  drawEarChart();
+  drawBpmChart();
 }
 
 function startCalibration() {
@@ -795,64 +840,92 @@ function drawEyeOverlay(leftPts, rightPts, closed) {
   }
 }
 
-function drawEarChart() {
-  const ctx = earChartCtx;
-  const w = earChartCanvas.width;
-  const h = earChartCanvas.height;
+function drawBpmChart() {
+  const ctx = bpmChartCtx;
+  const w = bpmChartCanvas.width;
+  const h = bpmChartCanvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  const minEar = 0.08;
-  const maxEar = 0.42;
+  const padLeft = 36;
+  const padRight = 12;
+  const padTop = 14;
+  const padBottom = 16;
+  const plotW = w - padLeft - padRight;
+  const plotH = h - padTop - padBottom;
+
+  const peakData = state.bpmHistory.reduce((m, s) => Math.max(m, s.bpm), 0);
+  const maxBpm = Math.max(30, Math.ceil((peakData + 5) / 5) * 5);
   const toY = (v) => {
-    const norm = Math.max(0, Math.min(1, (v - minEar) / (maxEar - minEar)));
-    return h - 14 - norm * (h - 28);
+    const norm = Math.max(0, Math.min(1, v / maxBpm));
+    return padTop + plotH - norm * plotH;
   };
 
-  ctx.strokeStyle = "rgba(147, 164, 199, 0.12)";
+  // Shaded healthy blink-rate band (15-20 BPM)
+  const healthyTop = toY(20);
+  const healthyBot = toY(15);
+  ctx.fillStyle = "rgba(52, 211, 153, 0.10)";
+  ctx.fillRect(padLeft, healthyTop, plotW, Math.max(2, healthyBot - healthyTop));
+
+  // Horizontal grid + Y-axis labels
+  ctx.strokeStyle = "rgba(147, 164, 199, 0.13)";
+  ctx.fillStyle = "#93a4c7";
+  ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
   ctx.lineWidth = 1;
-  for (const tick of [0.15, 0.25, 0.35]) {
+  const step = maxBpm <= 30 ? 10 : 15;
+  for (let tick = 0; tick <= maxBpm; tick += step) {
     const y = toY(tick);
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(w, y);
+    ctx.moveTo(padLeft, y);
+    ctx.lineTo(w - padRight, y);
     ctx.stroke();
+    ctx.fillText(String(tick), padLeft - 6, y);
   }
 
-  const ty = toY(state.earThreshold);
+  // Dry-eye alert threshold line
+  const lowLimit = parseFloat(lowBpmSlider.value);
+  const ty = toY(lowLimit);
   ctx.save();
   ctx.strokeStyle = "#fbbf24";
   ctx.setLineDash([6, 5]);
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(0, ty);
-  ctx.lineTo(w, ty);
+  ctx.moveTo(padLeft, ty);
+  ctx.lineTo(w - padRight, ty);
   ctx.stroke();
   ctx.restore();
 
-  if (state.earHistory.length < 2) return;
+  if (state.bpmHistory.length < 2) return;
 
-  ctx.strokeStyle = "#34d399";
-  ctx.lineWidth = 2.2;
+  const n = state.bpmHistory.length;
+  const pts = state.bpmHistory.map((sample, idx) => ({
+    x: padLeft + (idx / Math.max(1, n - 1)) * plotW,
+    y: toY(sample.bpm),
+    blink: sample.blink,
+  }));
+
+  // Gradient fill under BPM curve
+  const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
+  grad.addColorStop(0, "rgba(52, 211, 153, 0.28)");
+  grad.addColorStop(1, "rgba(52, 211, 153, 0.01)");
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  const n = state.earHistory.length;
-  state.earHistory.forEach((sample, idx) => {
-    const x = (idx / Math.max(1, n - 1)) * w;
-    const y = toY(sample.ear);
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  ctx.moveTo(pts[0].x, padTop + plotH);
+  pts.forEach((p) => ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length - 1].x, padTop + plotH);
+  ctx.closePath();
+  ctx.fill();
+
+  // BPM trend line
+  ctx.strokeStyle = "#34d399";
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  pts.forEach((p, idx) => {
+    if (idx === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
   });
   ctx.stroke();
-
-  ctx.fillStyle = "#38bdf8";
-  state.earHistory.forEach((sample, idx) => {
-    if (sample.blink) {
-      const x = (idx / Math.max(1, n - 1)) * w;
-      const y = toY(sample.ear);
-      ctx.beginPath();
-      ctx.arc(x, y, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  });
 }
 
 function appendBlinkRow(rec) {
@@ -864,7 +937,7 @@ function appendBlinkRow(rec) {
     <td>#${rec.blink_index}</td>
     <td>${rec.clock_time}</td>
     <td>${rec.duration_ms.toFixed(0)} ms</td>
-    <td>${rec.min_ear.toFixed(3)}</td>
+    <td>${t("bpmUnit", { bpm: rec.blink_rate_bpm.toFixed(1) })}</td>
   `;
   blinkLogBody.prepend(tr);
   while (blinkLogBody.children.length > 40) {
@@ -887,6 +960,7 @@ function updateBreakTimer(nowMs) {
     if (remSec <= 0) {
       state.inBreak = false;
       state.breaksCompleted += 1;
+      breaksSummaryText.textContent = t("breaksSummary", { count: state.breaksCompleted });
       state.nextBreakMs = nowMs + 20 * 60 * 1000;
       playTone("gentle");
       return null;
@@ -913,13 +987,11 @@ function processFrame(nowMs) {
 
   if (paused || videoEl.readyState < 2) return;
 
-  // Check duty-cycle camera off transition
   if (dutyCycleToggle.checked && state.dutyPhaseStartMs !== null && nowMs - state.dutyPhaseStartMs >= DUTY_ON_MS) {
     enterDutySleep();
     return;
   }
 
-  // FPS pacing (15 FPS Eco / 24 FPS Standard / 1.5 FPS Idle Backoff)
   const targetFps = getEffectiveFps(nowMs);
   const minIntervalMs = 1000 / targetFps;
   if (nowMs - state.lastInferMs < minIntervalMs) return;
@@ -936,13 +1008,18 @@ function processFrame(nowMs) {
     overlayCanvas.height = height;
   }
 
-  const dtSec = state.lastFrameMs === null ? 0 : Math.min(1, Math.max(0, (nowMs - state.lastFrameMs) / 1000));
-  state.lastFrameMs = nowMs;
-
   const result = faceLandmarker.detectForVideo(videoEl, nowMs);
   let blinkThisFrame = false;
   let drowsyNow = false;
   let closureMs = 0;
+
+  // Compute current rolling BPM up front so newly logged blinks carry accurate rate
+  const elapsedSec = Math.max(0, (nowMs - state.sessionStartMs) / 1000);
+  const bpmCutoff = nowMs - 60000;
+  while (state.blinkTimestamps.length && state.blinkTimestamps[0] < bpmCutoff) {
+    state.blinkTimestamps.shift();
+  }
+  const effWindow = Math.min(60, Math.max(elapsedSec, 1));
 
   if (!result.faceLandmarks || result.faceLandmarks.length === 0) {
     overlayCtx.clearRect(0, 0, width, height);
@@ -953,127 +1030,100 @@ function processFrame(nowMs) {
   } else {
     state.lastFaceMs = nowMs;
     const lm = result.faceLandmarks[0];
-    const left = computeEar(lm, LEFT_EYE, width, height);
-    const right = computeEar(lm, RIGHT_EYE, width, height);
-    const rawEar = (left.ear + right.ear) / 2;
+    const left = computeEyeOpenness(lm, LEFT_EYE, width, height);
+    const right = computeEyeOpenness(lm, RIGHT_EYE, width, height);
+    const rawSignal = (left.ratio + right.ratio) / 2;
 
-    state.smoothedEar =
-      state.smoothedEar === null
-        ? rawEar
-        : state.smoothingAlpha * rawEar + (1 - state.smoothingAlpha) * state.smoothedEar;
+    state.smoothedSignal =
+      state.smoothedSignal === null
+        ? rawSignal
+        : state.smoothingAlpha * rawSignal + (1 - state.smoothingAlpha) * state.smoothedSignal;
 
     if (state.calibrating) {
-      if (rawEar > 0.1) state.calibrationSamples.push(rawEar);
+      if (rawSignal > 0.1) state.calibrationSamples.push(rawSignal);
       const calElapsed = (nowMs - state.calibrationStartMs) / 1000;
       const pct = Math.min(100, Math.round((calElapsed / 3.0) * 100));
       setBanner("info", t("bannerCalibrating", { pct }));
       if (calElapsed >= 3.0 && state.calibrationSamples.length >= 8) {
         const sorted = [...state.calibrationSamples].sort((a, b) => a - b);
-        const baseline = sorted[Math.floor(sorted.length * 0.75)];
-        const adaptive = Math.max(0.14, Math.min(0.28, baseline * 0.72));
-        updateThresholdUI(adaptive);
+        state.baselineOpenRatio = sorted[Math.floor(sorted.length * 0.75)];
+        applySensitivity();
         state.calibrating = false;
         setBanner(null, "");
       }
     }
 
-    const closeThr = state.earThreshold;
-    const openThr = state.earThreshold + state.hysteresis;
+    const closeThr = state.internalThreshold;
+    const openThr = state.internalThreshold + state.hysteresis;
     const drowsyLimitMs = parseFloat(drowsySlider.value) * 1000;
 
     if (!state.eyesClosed) {
-      if (state.smoothedEar < closeThr) {
+      if (state.smoothedSignal < closeThr) {
         state.eyesClosed = true;
         state.closedFrames = 1;
         state.closureStartMs = nowMs;
-        state.closureMinEar = state.smoothedEar;
         state.drowsyTriggeredForClosure = false;
       }
-    } else {
-      state.closureMinEar = Math.min(state.closureMinEar, state.smoothedEar);
-      if (state.smoothedEar >= openThr) {
-        const durMs = Math.max(0, nowMs - state.closureStartMs);
-        const cooldownOk = state.lastBlinkMs === null || nowMs - state.lastBlinkMs >= 140;
-        if (!state.calibrating && state.closedFrames >= 2 && durMs >= 50 && durMs <= 800 && cooldownOk) {
-          state.totalBlinks += 1;
-          state.lastBlinkMs = nowMs;
-          state.blinkTimestamps.push(nowMs);
-          blinkThisFrame = true;
+    } else if (state.smoothedSignal >= openThr) {
+      const durMs = Math.max(0, nowMs - state.closureStartMs);
+      const cooldownOk = state.lastBlinkMs === null || nowMs - state.lastBlinkMs >= 140;
+      if (!state.calibrating && state.closedFrames >= 2 && durMs >= 50 && durMs <= 800 && cooldownOk) {
+        state.totalBlinks += 1;
+        state.lastBlinkMs = nowMs;
+        state.blinkTimestamps.push(nowMs);
+        blinkThisFrame = true;
 
-          const rec = {
-            blink_index: state.totalBlinks,
-            iso_time: new Date().toISOString(),
-            clock_time: new Date().toLocaleTimeString(),
-            elapsed_sec: Number(((nowMs - state.sessionStartMs) / 1000).toFixed(2)),
-            duration_ms: Number(durMs.toFixed(1)),
-            min_ear: Number(state.closureMinEar.toFixed(4)),
-            left_ear: Number(left.ear.toFixed(4)),
-            right_ear: Number(right.ear.toFixed(4)),
-          };
-          state.blinkRecords.push(rec);
-          appendBlinkRow(rec);
-        }
-        state.eyesClosed = false;
-        state.closedFrames = 0;
-        state.closureStartMs = null;
-        state.drowsyTriggeredForClosure = false;
-      } else {
-        state.closedFrames += 1;
-        closureMs = Math.max(0, nowMs - state.closureStartMs);
-        if (!state.calibrating && closureMs >= drowsyLimitMs) {
-          drowsyNow = true;
-          if (!state.drowsyTriggeredForClosure) {
-            state.drowsyTriggeredForClosure = true;
-            state.drowsyEvents += 1;
-            playTone("drowsy");
-          }
+        const rateNow = elapsedSec < 5 ? 0 : (state.blinkTimestamps.length / effWindow) * 60;
+        const rec = {
+          blink_index: state.totalBlinks,
+          iso_time: new Date().toISOString(),
+          clock_time: new Date().toLocaleTimeString(),
+          elapsed_sec: Number(elapsedSec.toFixed(2)),
+          duration_ms: Number(durMs.toFixed(1)),
+          blink_rate_bpm: Number(rateNow.toFixed(1)),
+        };
+        state.blinkRecords.push(rec);
+        appendBlinkRow(rec);
+      }
+      state.eyesClosed = false;
+      state.closedFrames = 0;
+      state.closureStartMs = null;
+      state.drowsyTriggeredForClosure = false;
+    } else {
+      state.closedFrames += 1;
+      closureMs = Math.max(0, nowMs - state.closureStartMs);
+      if (!state.calibrating && closureMs >= drowsyLimitMs) {
+        drowsyNow = true;
+        if (!state.drowsyTriggeredForClosure) {
+          state.drowsyTriggeredForClosure = true;
+          state.drowsyEvents += 1;
+          playTone("drowsy");
         }
       }
     }
 
     drawEyeOverlay(left.pts, right.pts, state.eyesClosed);
-    earValue.textContent = state.smoothedEar.toFixed(3);
     eyeStateText.textContent = state.eyesClosed ? t("eyesClosed") : t("eyesOpen");
-
-    state.earHistory.push({ ear: state.smoothedEar, blink: blinkThisFrame });
-    if (state.earHistory.length > 140) state.earHistory.shift();
-
-    // Throttle chart redraws in Eco mode (~6 Hz) to minimize canvas GPU repaints
-    const chartInterval = ecoToggle.checked ? 160 : 50;
-    if (blinkThisFrame || nowMs - state.lastChartDrawMs >= chartInterval) {
-      state.lastChartDrawMs = nowMs;
-      drawEarChart();
-    }
   }
 
-  // Rolling PERCLOS (60s)
-  if (dtSec > 0) {
-    state.perclosSamples.push({ t: nowMs, dt: dtSec, closed: state.eyesClosed });
-  }
-  const perclosCutoff = nowMs - 60000;
-  while (state.perclosSamples.length && state.perclosSamples[0].t < perclosCutoff) {
-    state.perclosSamples.shift();
-  }
-  const totalDt = state.perclosSamples.reduce((acc, s) => acc + s.dt, 0);
-  const closedDt = state.perclosSamples.reduce((acc, s) => acc + (s.closed ? s.dt : 0), 0);
-  const perclos = totalDt > 0 ? (closedDt / totalDt) * 100 : 0;
-  perclosText.textContent = `PERCLOS: ${perclos.toFixed(1)}%`;
-
-  // Session time & rolling BPM
-  const elapsedSec = Math.max(0, (nowMs - state.sessionStartMs) / 1000);
-  const bpmCutoff = nowMs - 60000;
-  while (state.blinkTimestamps.length && state.blinkTimestamps[0] < bpmCutoff) {
-    state.blinkTimestamps.shift();
-  }
-  const effWindow = Math.min(60, Math.max(elapsedSec, 1));
   const currentBpm = elapsedSec < 5 ? 0 : (state.blinkTimestamps.length / effWindow) * 60;
   const avgBpm = elapsedSec < 5 ? 0 : (state.totalBlinks / elapsedSec) * 60;
   if (currentBpm > state.maxBpm) state.maxBpm = currentBpm;
 
+  // Record 1 BPM trend sample per second (or immediately when a blink occurs)
+  if (blinkThisFrame || nowMs - state.lastBpmSampleMs >= 1000) {
+    state.lastBpmSampleMs = nowMs;
+    state.bpmHistory.push({ bpm: Number(currentBpm.toFixed(1)), blink: blinkThisFrame });
+    if (state.bpmHistory.length > 120) state.bpmHistory.shift();
+    drawBpmChart();
+  }
+
   totalBlinksValue.textContent = String(state.totalBlinks);
   bpmValue.textContent = currentBpm.toFixed(1);
+  avgBpmValue.textContent = avgBpm.toFixed(1);
+  peakBpmText.textContent = t("peakBpm", { bpm: state.maxBpm.toFixed(1) });
   sessionTimeValue.textContent = formatDuration(elapsedSec);
-  avgBpmText.textContent = t("avgBpm", { bpm: avgBpm.toFixed(1) });
+  breaksSummaryText.textContent = t("breaksSummary", { count: state.breaksCompleted });
 
   const breakMsg = updateBreakTimer(nowMs);
   const lowBpmLimit = parseFloat(lowBpmSlider.value);
@@ -1082,6 +1132,14 @@ function processFrame(nowMs) {
     state.lastDryEyeAlertMs = nowMs;
     state.dryEyeAlerts += 1;
     playTone("gentle");
+  }
+
+  if (elapsedSec < 5) {
+    rateHealthText.textContent = t("rateWarmup");
+  } else if (dryEyeWarn) {
+    rateHealthText.textContent = t("rateLow");
+  } else {
+    rateHealthText.textContent = t("rateHealthy");
   }
 
   if (!state.calibrating) {
@@ -1112,7 +1170,7 @@ function downloadFile(filename, content, mimeType) {
 }
 
 function exportCsv() {
-  const header = ["blink_index", "iso_time", "elapsed_sec", "duration_ms", "min_ear", "left_ear", "right_ear"];
+  const header = ["blink_index", "iso_time", "elapsed_sec", "duration_ms", "blink_rate_bpm"];
   const rows = state.blinkRecords.map((r) => header.map((k) => r[k]).join(","));
   const csv = [header.join(","), ...rows].join("\n");
   downloadFile(`blink-counter-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`, csv, "text/csv");
@@ -1132,7 +1190,6 @@ function exportJson() {
       drowsy_events: state.drowsyEvents,
       dry_eye_alerts: state.dryEyeAlerts,
       breaks_completed: state.breaksCompleted,
-      ear_threshold: Number(state.earThreshold.toFixed(4)),
     },
     blinks: state.blinkRecords,
   };
@@ -1157,6 +1214,7 @@ dutyCycleToggle.addEventListener("change", () => {
   state.dutyPhaseStartMs = performance.now();
   updatePowerBadge(performance.now());
 });
+sensitivitySelect.addEventListener("change", applySensitivity);
 
 toggleCameraBtn.addEventListener("click", () => (running ? stopCamera() : startCamera()));
 startBtnPrimary.addEventListener("click", startCamera);
@@ -1176,13 +1234,10 @@ takeBreakNowBtn.addEventListener("click", () => {
   playTone("gentle");
 });
 
-thresholdSlider.addEventListener("input", (e) => {
-  state.calibrating = false;
-  updateThresholdUI(parseFloat(e.target.value));
-  drawEarChart();
-});
 lowBpmSlider.addEventListener("input", (e) => {
   lowBpmReadout.textContent = e.target.value;
+  legendLowBpm.textContent = e.target.value;
+  drawBpmChart();
 });
 drowsySlider.addEventListener("input", (e) => {
   drowsyReadout.textContent = `${parseFloat(e.target.value).toFixed(1)}s`;
@@ -1194,4 +1249,4 @@ mirrorToggle.addEventListener("change", () => {
 // Initialize UI
 videoWrapper.classList.add("mirrored");
 applyStaticTranslations();
-drawEarChart();
+drawBpmChart();
