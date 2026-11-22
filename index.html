@@ -46,6 +46,14 @@
           <div class="video-wrapper">
             <video id="webcam" autoplay playsinline muted></video>
             <canvas id="overlayCanvas"></canvas>
+            <div id="hiddenPreviewOverlay" class="hidden-preview-overlay hidden">
+              <div class="placeholder-inner">
+                <div class="placeholder-icon">🔋</div>
+                <h2 data-i18n="videoHiddenTitle">Video Preview Off (Ultra-Low Battery)</h2>
+                <p data-i18n="videoHiddenDesc">Video and canvas rendering are paused to save GPU &amp; battery while blink frequency tracking continues in the background.</p>
+                <button id="showVideoBtn" class="btn btn-outline" data-i18n="showVideo">Show Video Preview</button>
+              </div>
+            </div>
             <div id="cameraPlaceholder" class="camera-placeholder">
               <div class="placeholder-inner">
                 <div class="placeholder-icon">📷</div>
@@ -115,6 +123,10 @@
           </div>
           <p id="powerHint" class="metric-sub" data-i18n="powerHint">Caps inference to 15 FPS, uses 480×270 video, and drops to 1.5 FPS when you step away.</p>
           <div class="toggles-row">
+            <label class="checkbox-label">
+              <input id="hideVideoToggle" type="checkbox" />
+              <span data-i18n="hideVideoLabel">Hide video preview (save GPU &amp; battery)</span>
+            </label>
             <label class="checkbox-label">
               <input id="idleBackoffToggle" type="checkbox" checked />
               <span data-i18n="idleBackoffLabel">No-face idle backoff (1.5 FPS)</span>

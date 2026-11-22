@@ -68,7 +68,11 @@ const I18N = {
     sessionTime: "Session Time",
     breaksSummary: "Breaks taken: {count}",
     powerTitle: "⚡ Power Saver (Eco Mode)",
-    powerHint: "Caps inference to 15 FPS, uses 480×270 video, and drops to 1.5 FPS when you step away.",
+    powerHint: "Caps inference to 15 FPS, stops all rendering when minimized, and drops to 1.5 FPS when away.",
+    hideVideoLabel: "Hide video preview (save GPU & battery)",
+    videoHiddenTitle: "Video Preview Off (Ultra-Low Battery)",
+    videoHiddenDesc: "Video and canvas rendering are paused to save GPU & battery while blink frequency tracking continues.",
+    showVideo: "Show Video Preview",
     idleBackoffLabel: "No-face idle backoff (1.5 FPS)",
     dutyCycleLabel: "Duty-cycle sampling (60s on / 240s camera off)",
     powerBadgeEco: "⚡ Eco · {fps} FPS",
@@ -165,7 +169,11 @@ const I18N = {
     sessionTime: "监测时长",
     breaksSummary: "已完成休息：{count} 次",
     powerTitle: "⚡ 省电模式 (Eco Mode)",
-    powerHint: "推理限帧 15 FPS、低清 480×270 采集，离开座位时自动降至 1.5 FPS。",
+    powerHint: "限帧 15 FPS、最小化时自动停止渲染，离开座位自动降至 1.5 FPS。",
+    hideVideoLabel: "隐藏视频画面（极致省电，不渲染视频）",
+    videoHiddenTitle: "已关闭视频预览（极致省电中）",
+    videoHiddenDesc: "已停止视频画面与画布渲染以大幅降低耗电，后台仍在持续监测眨眼频率并触发提醒。",
+    showVideo: "恢复视频预览",
     idleBackoffLabel: "无人脸自动降频 (1.5 FPS)",
     dutyCycleLabel: "间歇采样省电（开 60 秒 / 关摄像头 240 秒）",
     powerBadgeEco: "⚡ 省电 · {fps} FPS",
@@ -262,7 +270,11 @@ const I18N = {
     sessionTime: "計測時間",
     breaksSummary: "休憩回数: {count} 回",
     powerTitle: "⚡ 省電力モード (Eco Mode)",
-    powerHint: "推論を15 FPSに制限し、480×270映像と離席時の1.5 FPS待機で消費電力を削減。",
+    powerHint: "15 FPS制限・最小化時の描画自動停止・離席時1.5 FPS待機でバッテリー消費を最小化。",
+    hideVideoLabel: "映像プレビューを非表示（超省電力）",
+    videoHiddenTitle: "映像プレビューOFF（超省電力モード）",
+    videoHiddenDesc: "GPUとバッテリー節約のため映像描画を停止中です。まばたき頻度の計測とアラートは継続しています。",
+    showVideo: "映像を再表示",
     idleBackoffLabel: "顔未検出時の自動省電力 (1.5 FPS)",
     dutyCycleLabel: "間欠サンプリング（60秒計測 / 240秒カメラOFF）",
     powerBadgeEco: "⚡ 省電力 · {fps} FPS",
@@ -359,7 +371,11 @@ const I18N = {
     sessionTime: "Duración",
     breaksSummary: "Pausas: {count}",
     powerTitle: "⚡ Ahorro de Energía (Modo Eco)",
-    powerHint: "Limita la inferencia a 15 FPS, usa video 480×270 y baja a 1.5 FPS si te alejas.",
+    powerHint: "Limita a 15 FPS, detiene el renderizado al minimizar y baja a 1.5 FPS si te alejas.",
+    hideVideoLabel: "Ocultar vista previa de video (ahorro máximo)",
+    videoHiddenTitle: "Vista Previa Desactivada (Ahorro Máximo)",
+    videoHiddenDesc: "El renderizado de video y gráficos está pausado para ahorrar batería mientras sigue el monitoreo.",
+    showVideo: "Mostrar Video",
     idleBackoffLabel: "Modo inactivo sin rostro (1.5 FPS)",
     dutyCycleLabel: "Muestreo cíclico (60s activa / 240s cámara apagada)",
     powerBadgeEco: "⚡ Eco · {fps} FPS",
@@ -470,6 +486,9 @@ const blinkLogBody = document.getElementById("blinkLogBody");
 const logCountBadge = document.getElementById("logCountBadge");
 
 const ecoToggle = document.getElementById("ecoToggle");
+const hideVideoToggle = document.getElementById("hideVideoToggle");
+const hiddenPreviewOverlay = document.getElementById("hiddenPreviewOverlay");
+const showVideoBtn = document.getElementById("showVideoBtn");
 const idleBackoffToggle = document.getElementById("idleBackoffToggle");
 const dutyCycleToggle = document.getElementById("dutyCycleToggle");
 const lowBpmSlider = document.getElementById("lowBpmSlider");
@@ -497,6 +516,7 @@ const alertModalCloseBtn = document.getElementById("alertModalCloseBtn");
 let faceLandmarker = null;
 let mediaStream = null;
 let rafId = null;
+let bgTimerId = null;
 let dutySleepTimerId = null;
 let running = false;
 let paused = false;
@@ -598,7 +618,10 @@ function formatDuration(sec) {
 }
 
 function getEffectiveFps(nowMs) {
-  const base = ecoToggle.checked ? 15 : 24;
+  let base = ecoToggle.checked ? 15 : 24;
+  if (document.hidden) {
+    base = Math.min(base, 10);
+  }
   if (
     running &&
     idleBackoffToggle.checked &&
@@ -608,6 +631,44 @@ function getEffectiveFps(nowMs) {
     return 1.5;
   }
   return base;
+}
+
+function cancelLoop() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  if (bgTimerId !== null) {
+    clearTimeout(bgTimerId);
+    bgTimerId = null;
+  }
+}
+
+function scheduleNextTick() {
+  if (!running || inDutySleep) return;
+  if (document.hidden) {
+    // Minimized / backgrounded: zero visual rendering, lightweight background timer
+    const fps = getEffectiveFps(performance.now());
+    const delayMs = Math.max(85, Math.round(1000 / fps));
+    bgTimerId = setTimeout(() => {
+      bgTimerId = null;
+      processFrame(performance.now(), true);
+    }, delayMs);
+  } else {
+    rafId = requestAnimationFrame((ts) => {
+      rafId = null;
+      processFrame(ts, false);
+    });
+  }
+}
+
+function updateVideoVisibilityUI() {
+  const hideNow = running && !inDutySleep && hideVideoToggle.checked;
+  videoWrapper.classList.toggle("video-hidden", hideNow);
+  hiddenPreviewOverlay.classList.toggle("hidden", !hideNow);
+  if (hideNow) {
+    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  }
 }
 
 function updatePowerBadge(nowMs) {
@@ -861,11 +922,9 @@ function releaseMediaStream() {
 function enterDutySleep() {
   inDutySleep = true;
   state.dutyPhaseStartMs = performance.now();
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
+  cancelLoop();
   releaseMediaStream();
+  updateVideoVisibilityUI();
   placeholderEl.classList.remove("hidden");
   startBtnPrimary.classList.add("hidden");
   setStatusBadge(t("statusDutySleep"), "pill-eco");
@@ -880,11 +939,12 @@ function enterDutySleep() {
       try {
         await openMediaStream();
         placeholderEl.classList.add("hidden");
+        updateVideoVisibilityUI();
         state.dutyPhaseStartMs = performance.now();
         state.lastFaceMs = performance.now();
         setStatusBadge(t("statusLive"), "pill-live");
         updatePowerBadge(performance.now());
-        rafId = requestAnimationFrame(processFrame);
+        scheduleNextTick();
       } catch (err) {
         stopCamera();
         setBanner("danger", t("bannerCameraError", { err: err.message || err }));
@@ -927,9 +987,10 @@ async function startCamera() {
     calibrateBtn.disabled = false;
     setStatusBadge(t("statusLive"), "pill-live");
     updatePowerBadge(now);
+    updateVideoVisibilityUI();
 
     startCalibration();
-    rafId = requestAnimationFrame(processFrame);
+    scheduleNextTick();
   } catch (err) {
     console.error(err);
     setStatusBadge(t("statusError"), "pill-danger");
@@ -943,15 +1004,13 @@ function stopCamera() {
   running = false;
   paused = false;
   inDutySleep = false;
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
+  cancelLoop();
   if (dutySleepTimerId !== null) {
     clearTimeout(dutySleepTimerId);
     dutySleepTimerId = null;
   }
   releaseMediaStream();
+  updateVideoVisibilityUI();
   placeholderTitle.textContent = t("placeholderTitle");
   placeholderDesc.textContent = t("placeholderDesc");
   startBtnPrimary.classList.remove("hidden");
@@ -1149,9 +1208,9 @@ function updateBreakTimer(nowMs) {
   return null;
 }
 
-function processFrame(nowMs) {
+function processFrame(nowMs, isBackground = false) {
   if (!running || inDutySleep) return;
-  rafId = requestAnimationFrame(processFrame);
+  scheduleNextTick();
 
   if (paused || videoEl.readyState < 2) return;
 
@@ -1162,12 +1221,15 @@ function processFrame(nowMs) {
 
   const targetFps = getEffectiveFps(nowMs);
   const minIntervalMs = 1000 / targetFps;
-  if (nowMs - state.lastInferMs < minIntervalMs) return;
+  if (!isBackground && nowMs - state.lastInferMs < minIntervalMs) return;
   if (videoEl.currentTime === lastVideoTime) return;
 
   state.lastInferMs = nowMs;
   lastVideoTime = videoEl.currentTime;
-  updatePowerBadge(nowMs);
+  const skipVisualRender = isBackground || document.hidden || hideVideoToggle.checked;
+  if (!isBackground && !document.hidden) {
+    updatePowerBadge(nowMs);
+  }
 
   const width = videoEl.videoWidth;
   const height = videoEl.videoHeight;
@@ -1275,28 +1337,37 @@ function processFrame(nowMs) {
       }
     }
 
-    drawEyeOverlay(left.pts, right.pts, state.eyesClosed);
-    eyeStateText.textContent = state.eyesClosed ? t("eyesClosed") : t("eyesOpen");
+    if (!skipVisualRender) {
+      drawEyeOverlay(left.pts, right.pts, state.eyesClosed);
+    }
+    if (!isBackground && !document.hidden) {
+      eyeStateText.textContent = state.eyesClosed ? t("eyesClosed") : t("eyesOpen");
+    }
   }
 
   const currentBpm = elapsedSec < 5 ? 0 : (state.blinkTimestamps.length / effWindow) * 60;
   const avgBpm = elapsedSec < 5 ? 0 : (state.totalBlinks / elapsedSec) * 60;
   if (currentBpm > state.maxBpm) state.maxBpm = currentBpm;
 
-  // Record 1 BPM trend sample per second (or immediately when a blink occurs)
-  if (blinkThisFrame || nowMs - state.lastBpmSampleMs >= 1000) {
+  // Record 1 BPM trend sample per second; skip chart painting while minimized
+  const sampleInterval = hideVideoToggle.checked ? 2000 : 1000;
+  if (blinkThisFrame || nowMs - state.lastBpmSampleMs >= sampleInterval) {
     state.lastBpmSampleMs = nowMs;
     state.bpmHistory.push({ bpm: Number(currentBpm.toFixed(1)), blink: blinkThisFrame });
     if (state.bpmHistory.length > 120) state.bpmHistory.shift();
-    drawBpmChart();
+    if (!isBackground && !document.hidden) {
+      drawBpmChart();
+    }
   }
 
-  totalBlinksValue.textContent = String(state.totalBlinks);
-  bpmValue.textContent = currentBpm.toFixed(1);
-  avgBpmValue.textContent = avgBpm.toFixed(1);
-  peakBpmText.textContent = t("peakBpm", { bpm: state.maxBpm.toFixed(1) });
-  sessionTimeValue.textContent = formatDuration(elapsedSec);
-  breaksSummaryText.textContent = t("breaksSummary", { count: state.breaksCompleted });
+  if (!isBackground && !document.hidden) {
+    totalBlinksValue.textContent = String(state.totalBlinks);
+    bpmValue.textContent = currentBpm.toFixed(1);
+    avgBpmValue.textContent = avgBpm.toFixed(1);
+    peakBpmText.textContent = t("peakBpm", { bpm: state.maxBpm.toFixed(1) });
+    sessionTimeValue.textContent = formatDuration(elapsedSec);
+    breaksSummaryText.textContent = t("breaksSummary", { count: state.breaksCompleted });
+  }
 
   const breakMsg = updateBreakTimer(nowMs);
   const lowBpmLimit = parseFloat(lowBpmSlider.value);
@@ -1387,7 +1458,23 @@ langSelect.addEventListener("change", (e) => {
 });
 
 ecoToggle.addEventListener("change", () => updatePowerBadge(performance.now()));
+hideVideoToggle.addEventListener("change", () => updateVideoVisibilityUI());
+showVideoBtn.addEventListener("click", () => {
+  hideVideoToggle.checked = false;
+  updateVideoVisibilityUI();
+});
 idleBackoffToggle.addEventListener("change", () => updatePowerBadge(performance.now()));
+
+// Automatically stop all visual/canvas/chart rendering when minimized or backgrounded
+document.addEventListener("visibilitychange", () => {
+  if (!running || inDutySleep) return;
+  cancelLoop();
+  if (!document.hidden) {
+    updatePowerBadge(performance.now());
+    drawBpmChart();
+  }
+  scheduleNextTick();
+});
 dutyCycleToggle.addEventListener("change", () => {
   state.dutyPhaseStartMs = performance.now();
   updatePowerBadge(performance.now());
