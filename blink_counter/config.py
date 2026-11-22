@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from .power import PowerConfig
+
 
 def default_cache_dir() -> Path:
     """Return an OS-appropriate user cache directory for model files."""
@@ -71,13 +73,15 @@ class AppConfig:
 
     camera_index: int = 0
     video_source: Optional[str] = None
-    frame_width: int = 960
-    frame_height: int = 540
+    frame_width: int = 640
+    frame_height: int = 360
+    inference_width: int = 360
     mirror: bool = True
     headless: bool = False
     show_overlay: bool = True
     show_graph: bool = True
     backend: str = "auto"  # "auto", "mediapipe", "haar"
+    lang: str = "auto"     # "auto", "en", "zh", "ja", "es"
     log_dir: Optional[Path] = None
     save_logs: bool = True
     web_mode: bool = False
@@ -86,3 +90,4 @@ class AppConfig:
     open_browser: bool = True
     detector: DetectorConfig = field(default_factory=DetectorConfig)
     wellness: WellnessConfig = field(default_factory=WellnessConfig)
+    power: PowerConfig = field(default_factory=PowerConfig)

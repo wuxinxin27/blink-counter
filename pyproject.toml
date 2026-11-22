@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "blink-counter"
-version = "1.0.0"
-description = "Cross-platform automatic eye blink counter and eye-wellness tracker (macOS, Linux, Windows + Browser Web App)."
+version = "1.1.0"
+description = "Cross-platform automatic eye blink counter and eye-wellness tracker with Eco power-saving mode and multi-language support."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 authors = [
   { name = "Wu Ruixin" }
 ]
-keywords = ["blink-counter", "opencv", "mediapipe", "eye-aspect-ratio", "eye-health", "computer-vision"]
+keywords = ["blink-counter", "opencv", "mediapipe", "eye-aspect-ratio", "eye-health", "computer-vision", "low-power", "i18n"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Intended Audience :: End Users/Desktop",
@@ -34,6 +34,7 @@ dependencies = [
   "opencv-python>=4.8.0",
   "mediapipe>=0.10.9",
   "numpy>=1.24.0",
+  "pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]

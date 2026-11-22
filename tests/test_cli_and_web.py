@@ -19,6 +19,8 @@ class TestCliAndWeb(unittest.TestCase):
         self.assertTrue(default_cfg.detector.auto_calibrate)
         self.assertFalse(default_cfg.web_mode)
         self.assertTrue(default_cfg.wellness.enable_break_reminder)
+        self.assertFalse(default_cfg.power.eco_mode)
+        self.assertEqual(default_cfg.lang, "auto")
 
         custom_cfg = config_from_args(
             parser.parse_args(
@@ -30,6 +32,9 @@ class TestCliAndWeb(unittest.TestCase):
                     "--break-minutes", "0",
                     "--no-sound",
                     "--backend", "haar",
+                    "--eco",
+                    "--duty-cycle", "60:240",
+                    "--lang", "zh",
                 ]
             )
         )
@@ -40,6 +45,12 @@ class TestCliAndWeb(unittest.TestCase):
         self.assertFalse(custom_cfg.wellness.enable_break_reminder)
         self.assertFalse(custom_cfg.wellness.enable_sound)
         self.assertEqual(custom_cfg.backend, "haar")
+        self.assertTrue(custom_cfg.power.eco_mode)
+        self.assertEqual(custom_cfg.frame_width, 480)
+        self.assertEqual(custom_cfg.power.target_fps, 15.0)
+        self.assertEqual(custom_cfg.power.duty_on_sec, 60.0)
+        self.assertEqual(custom_cfg.power.duty_off_sec, 240.0)
+        self.assertEqual(custom_cfg.lang, "zh")
 
     def test_cross_platform_default_dirs(self) -> None:
         self.assertEqual(default_cache_dir().name, "blink-counter")
@@ -51,7 +62,10 @@ class TestCliAndWeb(unittest.TestCase):
         self.assertTrue(index_path.is_file())
         self.assertTrue((web_dir / "styles.css").is_file())
         self.assertTrue((web_dir / "app.js").is_file())
-        self.assertIn("Blink Counter", index_path.read_text(encoding="utf-8"))
+        html = index_path.read_text(encoding="utf-8")
+        self.assertIn("Blink Counter", html)
+        self.assertIn("langSelect", html)
+        self.assertIn("ecoToggle", html)
 
         server = create_web_server(host="127.0.0.1", port=0, web_dir=web_dir)
         port = server.server_address[1]

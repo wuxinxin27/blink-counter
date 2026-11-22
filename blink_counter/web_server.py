@@ -9,6 +9,8 @@ import webbrowser
 from pathlib import Path
 from typing import Optional
 
+from .i18n import Translator
+
 
 def locate_web_dir() -> Path:
     """Locate the bundled `web/` directory in source checkouts or installed packages."""
@@ -51,19 +53,22 @@ def serve_web_app(
     port: int = 8765,
     open_browser: bool = True,
     web_dir: Optional[Path] = None,
+    lang: str = "auto",
 ) -> int:
     """Serve the browser-based Blink Counter locally until interrupted."""
+    tr = Translator(lang)
     server = create_web_server(host=host, port=port, web_dir=web_dir)
     actual_port = server.server_address[1]
-    url = f"http://{host}:{actual_port}"
-    print(f"[blink-counter] Browser Web App running at {url}")
-    print("[blink-counter] All webcam processing runs 100% locally in your browser. Press Ctrl+C to stop.")
+    query = f"?lang={tr.lang}" if lang != "auto" else ""
+    url = f"http://{host}:{actual_port}/{query}"
+    print(tr.t("web_running", url=url))
+    print(tr.t("web_privacy"))
     if open_browser:
         webbrowser.open(url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n[blink-counter] Web server stopped.")
+        print("\n" + tr.t("web_stopped"))
     finally:
         server.server_close()
     return 0
