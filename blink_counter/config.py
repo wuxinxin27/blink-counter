@@ -65,6 +65,7 @@ class WellnessConfig:
     break_duration_sec: float = 20.0       # 20 seconds
     enable_break_reminder: bool = True
     enable_sound: bool = True
+    enable_popup: bool = True
 
 
 @dataclass

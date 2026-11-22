@@ -90,6 +90,17 @@ const I18N = {
     sensStandard: "Standard",
     sensHigh: "High",
     soundAlerts: "Sound alerts",
+    popupAlerts: "Pop-up & system alerts",
+    testAlert: "🔔 Test Pop-up & Sound",
+    modalDismiss: "Got it",
+    popupDryEyeTitle: "Blink Reminder — Low Blink Rate",
+    popupDryEyeBody: "Your blink rate dropped to {bpm} blinks/min (healthy: 15–20). Please blink gently a few times to keep your eyes moist.",
+    popupBreakTitle: "20-20-20 Eye Break — Look Far Away",
+    popupBreakBody: "Time to relax your eyes! Look at something 20 ft (6 m) away for 20 seconds.",
+    popupBreakDoneTitle: "Eye Break Complete",
+    popupBreakDoneBody: "Great job! Your 20-second far-gaze break is complete.",
+    popupDrowsyTitle: "Drowsiness Alert",
+    popupDrowsyBody: "Your eyes have been closed for {sec}s. Take a brief rest if you feel tired.",
     eyeLandmarks: "Eye tracking lines",
     mirrorVideo: "Mirror video",
     recentBlinks: "Recent Blinks",
@@ -176,6 +187,17 @@ const I18N = {
     sensStandard: "标准",
     sensHigh: "高",
     soundAlerts: "提示音",
+    popupAlerts: "弹窗与系统通知提醒",
+    testAlert: "🔔 测试弹窗与音效",
+    modalDismiss: "知道了",
+    popupDryEyeTitle: "护眼提醒：眨眼频率过低",
+    popupDryEyeBody: "当前眨眼频率仅 {bpm} 次/分（健康参考 15–20 次/分）。请有意识地轻轻多眨几次眼，缓解眼干疲劳。",
+    popupBreakTitle: "远眺护眼提醒 (20-20-20)",
+    popupBreakBody: "已连续用眼一段时间，请将视线移开屏幕，远眺 6 米外景物 20 秒放松双眼。",
+    popupBreakDoneTitle: "远眺休息完成",
+    popupBreakDoneBody: "已完成 20 秒远眺放松，现在可以继续使用电脑了。",
+    popupDrowsyTitle: "疲劳闭眼预警",
+    popupDrowsyBody: "检测到您已连续闭眼 {sec} 秒，如感到困倦请适当休息。",
     eyeLandmarks: "眼部轮廓线",
     mirrorVideo: "镜像画面",
     recentBlinks: "最近眨眼记录",
@@ -262,6 +284,17 @@ const I18N = {
     sensStandard: "標準",
     sensHigh: "高",
     soundAlerts: "音声アラート",
+    popupAlerts: "ポップアップ＆システム通知",
+    testAlert: "🔔 ポップアップ＆音テスト",
+    modalDismiss: "OK",
+    popupDryEyeTitle: "まばたきリマインダー（頻度低下）",
+    popupDryEyeBody: "現在のまばたき頻度は {bpm} 回/分です（目安 15–20）。ドライアイ予防のためゆっくり数回まばたきしましょう。",
+    popupBreakTitle: "20-20-20 遠くを見る休憩",
+    popupBreakBody: "目を休める時間です。画面から目を離し、6m先を20秒間眺めてください。",
+    popupBreakDoneTitle: "目の休憩が完了しました",
+    popupBreakDoneBody: "20秒間の遠方休憩が完了しました。",
+    popupDrowsyTitle: "眠気警告",
+    popupDrowsyBody: "{sec} 秒間目が閉じています。疲れている場合は少し休憩してください。",
     eyeLandmarks: "目のトラッキング線",
     mirrorVideo: "左右反転",
     recentBlinks: "最近のまばたき",
@@ -348,6 +381,17 @@ const I18N = {
     sensStandard: "Estándar",
     sensHigh: "Alta",
     soundAlerts: "Sonido",
+    popupAlerts: "Ventanas emergentes y notificaciones",
+    testAlert: "🔔 Probar Aviso y Sonido",
+    modalDismiss: "Entendido",
+    popupDryEyeTitle: "Recordatorio: Parpadeo Bajo",
+    popupDryEyeBody: "Tu frecuencia bajó a {bpm} parpadeos/min (normal: 15–20). Parpadea suavemente varias veces para lubricar tus ojos.",
+    popupBreakTitle: "Pausa 20-20-20 — Mira a lo Lejos",
+    popupBreakBody: "Relaja tu vista: mira un punto a 6 metros de distancia durante 20 segundos.",
+    popupBreakDoneTitle: "Pausa Visual Completada",
+    popupBreakDoneBody: "¡Excelente! Terminaron los 20 segundos de descanso visual.",
+    popupDrowsyTitle: "Alerta de Somnolencia",
+    popupDrowsyBody: "Tus ojos llevan cerrados {sec}s. Toma un descanso breve si tienes sueño.",
     eyeLandmarks: "Líneas oculares",
     mirrorVideo: "Espejo",
     recentBlinks: "Parpadeos Recientes",
@@ -434,10 +478,20 @@ const legendLowBpm = document.getElementById("legendLowBpm");
 const drowsySlider = document.getElementById("drowsySlider");
 const drowsyReadout = document.getElementById("drowsyReadout");
 const sensitivitySelect = document.getElementById("sensitivitySelect");
+const popupToggle = document.getElementById("popupToggle");
+const testAlertBtn = document.getElementById("testAlertBtn");
 const soundToggle = document.getElementById("soundToggle");
 const overlayToggle = document.getElementById("overlayToggle");
 const mirrorToggle = document.getElementById("mirrorToggle");
 const breakToggle = document.getElementById("breakToggle");
+
+const alertModalBackdrop = document.getElementById("alertModalBackdrop");
+const alertModalCard = document.getElementById("alertModalCard");
+const alertModalIcon = document.getElementById("alertModalIcon");
+const alertModalTitle = document.getElementById("alertModalTitle");
+const alertModalBody = document.getElementById("alertModalBody");
+const alertModalCountdown = document.getElementById("alertModalCountdown");
+const alertModalCloseBtn = document.getElementById("alertModalCloseBtn");
 
 // Runtime state
 let faceLandmarker = null;
@@ -576,27 +630,122 @@ function updatePowerBadge(nowMs) {
   }
 }
 
-function playTone(type = "gentle") {
+let modalAutoCloseTimer = null;
+let activeModalKind = null;
+
+function playTone(type = "dry_eye") {
   if (!soundToggle.checked) return;
   try {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioCtx.state === "suspended") audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type === "drowsy" ? "triangle" : "sine";
-    osc.frequency.setValueAtTime(type === "drowsy" ? 880 : 620, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.12, audioCtx.currentTime + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + (type === "drowsy" ? 0.35 : 0.18));
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + (type === "drowsy" ? 0.38 : 0.2));
+
+    // Distinct, pleasant multi-note melodies so each eye-care reminder is unmistakable
+    const sequences = {
+      dry_eye: [
+        { freq: 659.25, delay: 0.0, dur: 0.16, wave: "sine", vol: 0.22 },
+        { freq: 880.0, delay: 0.20, dur: 0.24, wave: "sine", vol: 0.24 },
+      ],
+      break: [
+        { freq: 523.25, delay: 0.0, dur: 0.16, wave: "sine", vol: 0.22 },
+        { freq: 659.25, delay: 0.18, dur: 0.16, wave: "sine", vol: 0.22 },
+        { freq: 783.99, delay: 0.36, dur: 0.30, wave: "sine", vol: 0.25 },
+      ],
+      break_done: [
+        { freq: 783.99, delay: 0.0, dur: 0.14, wave: "sine", vol: 0.20 },
+        { freq: 1046.5, delay: 0.16, dur: 0.26, wave: "sine", vol: 0.22 },
+      ],
+      drowsy: [
+        { freq: 920.0, delay: 0.0, dur: 0.18, wave: "triangle", vol: 0.26 },
+        { freq: 920.0, delay: 0.24, dur: 0.18, wave: "triangle", vol: 0.26 },
+        { freq: 1046.5, delay: 0.48, dur: 0.28, wave: "triangle", vol: 0.28 },
+      ],
+    };
+
+    const notes = sequences[type] || sequences.dry_eye;
+    const baseTime = audioCtx.currentTime;
+    for (const note of notes) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = note.wave;
+      osc.frequency.setValueAtTime(note.freq, baseTime + note.delay);
+      gain.gain.setValueAtTime(0.0001, baseTime + note.delay);
+      gain.gain.exponentialRampToValueAtTime(note.vol, baseTime + note.delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, baseTime + note.delay + note.dur);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(baseTime + note.delay);
+      osc.stop(baseTime + note.delay + note.dur + 0.03);
+    }
   } catch {
     // AudioContext may be blocked until user interaction
   }
+}
+
+function requestSystemNotificationPermission() {
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
+function sendSystemNotification(title, body) {
+  if (!popupToggle.checked) return;
+  if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(title, {
+        body,
+        icon: "icons/icon-192.png",
+        silent: false,
+      });
+    } catch {
+      // Ignore browser notification restrictions
+    }
+  }
+}
+
+function closeAlertModal() {
+  if (modalAutoCloseTimer !== null) {
+    clearTimeout(modalAutoCloseTimer);
+    modalAutoCloseTimer = null;
+  }
+  activeModalKind = null;
+  alertModalBackdrop.classList.add("hidden");
+  alertModalCountdown.classList.add("hidden");
+}
+
+function showAlertModal({ kind, title, body, countdownSec = null, autoCloseMs = 10000 }) {
+  if (!popupToggle.checked) return;
+  if (modalAutoCloseTimer !== null) {
+    clearTimeout(modalAutoCloseTimer);
+    modalAutoCloseTimer = null;
+  }
+  activeModalKind = kind;
+  const iconMap = { dry_eye: "💧", break: "🌿", break_done: "✅", drowsy: "⚠️" };
+  const clsMap = { dry_eye: "modal-dry-eye", break: "modal-break", break_done: "modal-break", drowsy: "modal-drowsy" };
+
+  alertModalIcon.textContent = iconMap[kind] || "👁️";
+  alertModalCard.className = `modal-card ${clsMap[kind] || "modal-dry-eye"}`;
+  alertModalTitle.textContent = title;
+  alertModalBody.textContent = body;
+
+  if (countdownSec !== null) {
+    alertModalCountdown.textContent = `${Math.ceil(countdownSec)}s`;
+    alertModalCountdown.classList.remove("hidden");
+  } else {
+    alertModalCountdown.classList.add("hidden");
+  }
+  alertModalBackdrop.classList.remove("hidden");
+
+  if (autoCloseMs > 0) {
+    modalAutoCloseTimer = setTimeout(closeAlertModal, autoCloseMs);
+  }
+}
+
+function triggerReminder({ kind, title, body, countdownSec = null, autoCloseMs = 10000 }) {
+  playTone(kind);
+  showAlertModal({ kind, title, body, countdownSec, autoCloseMs });
+  sendSystemNotification(title, body);
 }
 
 function setBanner(kind, message) {
@@ -753,6 +902,7 @@ function enterDutySleep() {
 
 async function startCamera() {
   try {
+    requestSystemNotificationPermission();
     toggleCameraBtn.disabled = true;
     startBtnPrimary.disabled = true;
     await initFaceLandmarker();
@@ -961,12 +1111,20 @@ function updateBreakTimer(nowMs) {
     const remSec = Math.max(0, (state.breakEndMs - nowMs) / 1000);
     breakTimerValue.textContent = `${Math.ceil(remSec)}s`;
     breakHint.textContent = t("breakLookAway");
+    if (activeModalKind === "break" && !alertModalBackdrop.classList.contains("hidden")) {
+      alertModalCountdown.textContent = `${Math.ceil(remSec)}s`;
+    }
     if (remSec <= 0) {
       state.inBreak = false;
       state.breaksCompleted += 1;
       breaksSummaryText.textContent = t("breaksSummary", { count: state.breaksCompleted });
       state.nextBreakMs = nowMs + 20 * 60 * 1000;
-      playTone("gentle");
+      triggerReminder({
+        kind: "break_done",
+        title: t("popupBreakDoneTitle"),
+        body: t("popupBreakDoneBody"),
+        autoCloseMs: 5000,
+      });
       return null;
     }
     return t("bannerBreak", { sec: Math.ceil(remSec) });
@@ -979,7 +1137,13 @@ function updateBreakTimer(nowMs) {
   if (untilSec <= 0) {
     state.inBreak = true;
     state.breakEndMs = nowMs + 20 * 1000;
-    playTone("gentle");
+    triggerReminder({
+      kind: "break",
+      title: t("popupBreakTitle"),
+      body: t("popupBreakBody"),
+      countdownSec: 20,
+      autoCloseMs: 0,
+    });
     return t("bannerBreak", { sec: 20 });
   }
   return null;
@@ -1101,7 +1265,12 @@ function processFrame(nowMs) {
         if (!state.drowsyTriggeredForClosure) {
           state.drowsyTriggeredForClosure = true;
           state.drowsyEvents += 1;
-          playTone("drowsy");
+          triggerReminder({
+            kind: "drowsy",
+            title: t("popupDrowsyTitle"),
+            body: t("popupDrowsyBody", { sec: (closureMs / 1000).toFixed(1) }),
+            autoCloseMs: 8000,
+          });
         }
       }
     }
@@ -1135,7 +1304,12 @@ function processFrame(nowMs) {
   if (dryEyeWarn && (state.lastDryEyeAlertMs === null || nowMs - state.lastDryEyeAlertMs >= 45000)) {
     state.lastDryEyeAlertMs = nowMs;
     state.dryEyeAlerts += 1;
-    playTone("gentle");
+    triggerReminder({
+      kind: "dry_eye",
+      title: t("popupDryEyeTitle"),
+      body: t("popupDryEyeBody", { bpm: currentBpm.toFixed(1) }),
+      autoCloseMs: 9000,
+    });
   }
 
   if (elapsedSec < 5) {
@@ -1232,10 +1406,36 @@ resetBtn.addEventListener("click", () => resetSession(true));
 exportCsvBtn.addEventListener("click", exportCsv);
 exportJsonBtn.addEventListener("click", exportJson);
 takeBreakNowBtn.addEventListener("click", () => {
+  requestSystemNotificationPermission();
   const now = performance.now();
   state.inBreak = true;
   state.breakEndMs = now + 20 * 1000;
-  playTone("gentle");
+  triggerReminder({
+    kind: "break",
+    title: t("popupBreakTitle"),
+    body: t("popupBreakBody"),
+    countdownSec: 20,
+    autoCloseMs: 0,
+  });
+});
+
+popupToggle.addEventListener("change", () => {
+  if (popupToggle.checked) requestSystemNotificationPermission();
+});
+
+testAlertBtn.addEventListener("click", () => {
+  requestSystemNotificationPermission();
+  triggerReminder({
+    kind: "dry_eye",
+    title: t("popupDryEyeTitle"),
+    body: t("popupDryEyeBody", { bpm: "6.0" }),
+    autoCloseMs: 8000,
+  });
+});
+
+alertModalCloseBtn.addEventListener("click", closeAlertModal);
+alertModalBackdrop.addEventListener("click", (e) => {
+  if (e.target === alertModalBackdrop) closeAlertModal();
 });
 
 lowBpmSlider.addEventListener("input", (e) => {
@@ -1249,6 +1449,13 @@ drowsySlider.addEventListener("input", (e) => {
 mirrorToggle.addEventListener("change", () => {
   videoWrapper.classList.toggle("mirrored", mirrorToggle.checked);
 });
+
+// Keep 20-20-20 break countdown ticking even if camera is stopped or paused
+setInterval(() => {
+  if (state.inBreak && (!running || paused || inDutySleep)) {
+    updateBreakTimer(performance.now());
+  }
+}, 500);
 
 // Initialize UI
 videoWrapper.classList.add("mirrored");

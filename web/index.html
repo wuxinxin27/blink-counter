@@ -177,6 +177,10 @@
 
           <div class="toggles-row">
             <label class="checkbox-label">
+              <input id="popupToggle" type="checkbox" checked />
+              <span data-i18n="popupAlerts">Pop-up &amp; system alerts</span>
+            </label>
+            <label class="checkbox-label">
               <input id="soundToggle" type="checkbox" checked />
               <span data-i18n="soundAlerts">Sound alerts</span>
             </label>
@@ -188,6 +192,9 @@
               <input id="mirrorToggle" type="checkbox" checked />
               <span data-i18n="mirrorVideo">Mirror video</span>
             </label>
+          </div>
+          <div class="alert-actions-row">
+            <button id="testAlertBtn" class="btn btn-outline btn-sm" data-i18n="testAlert">🔔 Test Pop-up &amp; Sound</button>
           </div>
         </section>
 
@@ -219,6 +226,17 @@
       <span data-i18n="footerLeft">Blink Counter · Open-Source Cross-Platform Project (macOS, Linux &amp; Windows)</span>
       <span data-i18n="footerRight">100% Free &amp; Local Blink Frequency &amp; Eye-Wellness Tracking</span>
     </footer>
+  </div>
+
+  <!-- Prominent Eye-Care Pop-up Modal (Low Blink Rate / 20-20-20 Far-Gaze / Drowsiness) -->
+  <div id="alertModalBackdrop" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="alertModalTitle">
+    <div id="alertModalCard" class="modal-card modal-dry-eye">
+      <div id="alertModalIcon" class="modal-icon" aria-hidden="true">💧</div>
+      <h2 id="alertModalTitle" class="modal-title">Blink Reminder</h2>
+      <p id="alertModalBody" class="modal-body"></p>
+      <div id="alertModalCountdown" class="modal-countdown hidden">20s</div>
+      <button id="alertModalCloseBtn" class="btn btn-primary btn-lg" data-i18n="modalDismiss">Got it</button>
+    </div>
   </div>
 
   <script type="module" src="app.js"></script>

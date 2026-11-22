@@ -16,7 +16,7 @@ from .i18n import SUPPORTED_LANGUAGES, Translator
 from .logger import SessionLogger
 from .power import PowerConfig, PowerController, parse_duty_cycle
 from .web_server import serve_web_app
-from .wellness import WellnessMonitor, play_alert_sound
+from .wellness import WellnessMonitor, play_alert_sound, show_desktop_popup
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -145,6 +145,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="20-20-20 eye break reminder interval in minutes; 0 disables (default: 20).",
     )
     parser.add_argument("--no-sound", action="store_true", help="Mute audible alerts.")
+    parser.add_argument("--no-popup", action="store_true", help="Disable OS pop-up alert dialogs.")
     parser.add_argument("--no-log", action="store_true", help="Do not save session CSV/JSON logs on exit.")
     parser.add_argument(
         "--log-dir",
@@ -175,6 +176,7 @@ def config_from_args(args: argparse.Namespace) -> AppConfig:
         break_interval_sec=max(0.0, args.break_minutes * 60.0),
         enable_break_reminder=args.break_minutes > 0,
         enable_sound=not args.no_sound,
+        enable_popup=not args.no_popup,
     )
     power_cfg = PowerConfig(
         eco_mode=eco,
@@ -246,6 +248,7 @@ def run_desktop(config: AppConfig) -> int:
     logger = SessionLogger(log_dir=config.log_dir)
 
     muted = not config.wellness.enable_sound
+    popup_enabled = config.wellness.enable_popup
     paused = False
     show_graph = config.show_graph
     show_overlay = config.show_overlay
@@ -358,11 +361,46 @@ def run_desktop(config: AppConfig) -> int:
                 if analysis.blink_event is not None:
                     logger.log_blink(analysis.blink_event, snap.current_bpm)
 
-                if not muted:
-                    if analysis.drowsy_triggered:
+                if analysis.drowsy_triggered:
+                    if not muted:
                         play_alert_sound("drowsy")
-                    elif snap.dry_eye_triggered or snap.break_status.break_started:
-                        play_alert_sound("gentle")
+                    if popup_enabled:
+                        show_desktop_popup(
+                            tr.t("popup_drowsy_title"),
+                            tr.t("popup_drowsy_body", sec=analysis.closure_duration_ms / 1000.0),
+                            kind="drowsy",
+                            timeout_sec=8,
+                        )
+                elif snap.break_status.break_started:
+                    if not muted:
+                        play_alert_sound("break")
+                    if popup_enabled:
+                        show_desktop_popup(
+                            tr.t("popup_break_title"),
+                            tr.t("popup_break_body", sec=int(config.wellness.break_duration_sec)),
+                            kind="break",
+                            timeout_sec=int(config.wellness.break_duration_sec),
+                        )
+                elif snap.break_status.break_completed:
+                    if not muted:
+                        play_alert_sound("break_done")
+                    if popup_enabled:
+                        show_desktop_popup(
+                            tr.t("popup_break_done_title"),
+                            tr.t("popup_break_done_body"),
+                            kind="break_done",
+                            timeout_sec=5,
+                        )
+                elif snap.dry_eye_triggered:
+                    if not muted:
+                        play_alert_sound("dry_eye")
+                    if popup_enabled:
+                        show_desktop_popup(
+                            tr.t("popup_dry_eye_title"),
+                            tr.t("popup_dry_eye_body", bpm=snap.current_bpm),
+                            kind="dry_eye",
+                            timeout_sec=8,
+                        )
             else:
                 extraction = last_extraction
                 analysis = last_analysis or detector.update_no_face(now)
@@ -502,6 +540,15 @@ def _handle_hotkey(
             state["show_graph"] = False
     elif key in (ord("l"), ord("L")):
         translator.cycle_language()
+    elif key in (ord("t"), ord("T")):
+        if not state["muted"]:
+            play_alert_sound("dry_eye")
+        show_desktop_popup(
+            translator.t("popup_dry_eye_title"),
+            translator.t("popup_dry_eye_body", bpm=snap.current_bpm if snap else 6.0),
+            kind="dry_eye",
+            timeout_sec=6,
+        )
     elif key in (ord("s"), ord("S")) and snap is not None:
         csv_p, json_p = logger.save(
             duration_sec=snap.elapsed_sec,

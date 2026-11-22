@@ -66,6 +66,8 @@ class TestCliAndWeb(unittest.TestCase):
         self.assertIn("Blink Counter", html)
         self.assertIn("langSelect", html)
         self.assertIn("ecoToggle", html)
+        self.assertIn("alertModalBackdrop", html)
+        self.assertIn("testAlertBtn", html)
 
         server = create_web_server(host="127.0.0.1", port=0, web_dir=web_dir)
         port = server.server_address[1]

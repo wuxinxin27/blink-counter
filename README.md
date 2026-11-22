@@ -24,7 +24,7 @@ Includes **two ways to run** in one repository:
   - **Duty-Cycle Wellness Sampling (`--duty-cycle 60:240`)**: Monitors for 60 s, then **completely releases the camera hardware** for 240 s to save laptop battery.
 - **🌐 Multi-Language Support (i18n)**: Switch live between **English (`en`)**, **简体中文 (`zh`)**, **日本語 (`ja`)**, and **Español (`es`)** via `--lang`, the `L` hotkey on desktop, or the top-bar dropdown in the Web App (auto-detects your OS/browser language by default).
 - **3-Second Auto-Calibration**: Automatically learns your personal open-eye baseline EAR and adapts the blink threshold.
-- **Live Blink Rate (BPM) & Dry-Eye Alerts**: Tracks rolling 60-second blinks-per-minute (healthy range: 15–20 BPM) and gently alerts you if your blink rate drops too low.
+- **Live Blink Rate (BPM), Pop-Up Dialogs & Distinct Sound Melodies**: Tracks rolling 60-second blinks-per-minute (healthy range: 15–20 BPM) and triggers **always-on-top pop-up dialogs + OS notifications + distinct multi-note chimes** when your blink rate drops too low or when it's time for a 20-20-20 far-gaze break (press `T` on desktop or click **Test Pop-up & Sound** in the Web App to preview).
 - **Drowsiness / Prolonged Closure Detection & PERCLOS**: Distinguishes natural blinks from extended eye closure (> 1.5 s) and computes rolling **PERCLOS**.
 - **20-20-20 Eye Break Timer**: Built-in reminder every 20 minutes to look 20 feet (6 m) away for 20 seconds.
 - **Session Logging & Export**: Exports every blink event to **CSV** and full session statistics to **JSON**.
@@ -44,7 +44,7 @@ Includes **two ways to run** in one repository:
 
 ### Option 2: Native Standalone App Installer (`.dmg` / `.exe` / Linux binary)
 
-- **macOS (Apple Silicon)**: Download **`BlinkCounter-1.2.0-macOS-arm64.dmg`** from [GitHub Releases](https://github.com/wuxinxin27/blink-counter/releases), open the `.dmg`, and drag **`Blink Counter.app`** into **Applications**.
+- **macOS (Apple Silicon)**: Download **`BlinkCounter-1.3.0-macOS-arm64.dmg`** from [GitHub Releases](https://github.com/wuxinxin27/blink-counter/releases), open the `.dmg`, and drag **`Blink Counter.app`** into **Applications**.
 - **Build a standalone app for macOS / Windows / Linux yourself** (generates `.app` + `.dmg`, `.exe`, or Linux binary with bundled icons and offline AI model):
 
 ```bash

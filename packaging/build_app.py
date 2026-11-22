@@ -138,8 +138,11 @@ def main() -> int:
         _patch_macos_info_plist(app_path, __version__)
         if shutil.which("codesign"):
             _run(["codesign", "--force", "--deep", "--sign", "-", str(app_path)])
-        dmg_path = _create_macos_dmg(app_path, __version__)
-        print(f"\n[build] macOS app ready:\n  App : {app_path}\n  DMG : {dmg_path}")
+        if "--no-dmg" in sys.argv:
+            print(f"\n[build] macOS app ready:\n  App : {app_path}")
+        else:
+            dmg_path = _create_macos_dmg(app_path, __version__)
+            print(f"\n[build] macOS app ready:\n  App : {app_path}\n  DMG : {dmg_path}")
     elif sys.platform == "win32":
         exe_path = DIST_DIR / "BlinkCounter.exe"
         print(f"\n[build] Windows executable ready:\n  EXE : {exe_path}")
