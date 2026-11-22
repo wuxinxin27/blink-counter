@@ -25,6 +25,7 @@ const I18N = {
     pageTitle: "Blink Counter — Cross-Platform Eye Wellness Tracker",
     appTitle: "Blink Counter",
     appSubtitle: "Real-time blink frequency & eye-wellness tracker",
+    installApp: "⬇ Install App",
     privacyBadge: "🔒 100% Local Processing",
     statusReady: "Ready",
     statusLoading: "Loading AI Model…",
@@ -110,6 +111,7 @@ const I18N = {
     pageTitle: "眨眼计数器 — 跨平台护眼频率监测助手",
     appTitle: "眨眼计数器",
     appSubtitle: "实时眨眼频率监测与护眼健康助手",
+    installApp: "⬇ 安装到本地",
     privacyBadge: "🔒 100% 本地处理",
     statusReady: "就绪",
     statusLoading: "正在加载模型…",
@@ -195,6 +197,7 @@ const I18N = {
     pageTitle: "まばたきカウンター — 目の健康トラッカー",
     appTitle: "まばたきカウンター",
     appSubtitle: "リアルタイムまばたき頻度＆アイケアアシスタント",
+    installApp: "⬇ アプリをインストール",
     privacyBadge: "🔒 100% ローカル処理",
     statusReady: "準備完了",
     statusLoading: "モデル読込中…",
@@ -280,6 +283,7 @@ const I18N = {
     pageTitle: "Contador de Parpadeos — Salud Visual Multiplataforma",
     appTitle: "Contador de Parpadeos",
     appSubtitle: "Monitor de frecuencia de parpadeo y salud visual en tiempo real",
+    installApp: "⬇ Instalar App",
     privacyBadge: "🔒 100% Procesamiento Local",
     statusReady: "Listo",
     statusLoading: "Cargando modelo…",
@@ -1250,3 +1254,34 @@ mirrorToggle.addEventListener("change", () => {
 videoWrapper.classList.add("mirrored");
 applyStaticTranslations();
 drawBpmChart();
+
+// Progressive Web App (PWA) install support for macOS, Windows, and Linux
+const installAppBtn = document.getElementById("installAppBtn");
+let deferredInstallPrompt = null;
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  if (installAppBtn) installAppBtn.classList.remove("hidden");
+});
+
+if (installAppBtn) {
+  installAppBtn.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installAppBtn.classList.add("hidden");
+  });
+}
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  if (installAppBtn) installAppBtn.classList.add("hidden");
+});

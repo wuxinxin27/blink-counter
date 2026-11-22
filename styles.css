@@ -314,6 +314,22 @@ body {
   font-size: 0.8rem;
 }
 
+.btn-install {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+}
+
+.btn-install:hover {
+  background: linear-gradient(135deg, #047857, #34d399);
+}
+
+.hidden {
+  display: none !important;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
