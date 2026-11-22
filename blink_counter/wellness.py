@@ -1,4 +1,4 @@
-"""Eye-wellness analytics: live BPM, dry-eye alerts, 20-20-20 break timer, and sound alerts."""
+"""Eye-wellness analytics: live BPM, BPM trend history, dry-eye alerts, 20-20-20 break timer, and sound alerts."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import sys
 import threading
 from collections import deque
 from dataclasses import dataclass
-from typing import Deque, Optional
+from typing import Deque, Optional, Sequence, Tuple
 
 from .config import WellnessConfig
 
@@ -34,6 +34,7 @@ class WellnessSnapshot:
     current_bpm: float
     avg_bpm: float
     max_bpm: float
+    low_bpm_threshold: float
     dry_eye_warning: bool
     dry_eye_triggered: bool
     dry_eye_alerts: int
@@ -41,7 +42,7 @@ class WellnessSnapshot:
 
 
 class WellnessMonitor:
-    """Tracks blink rate (BPM), dry-eye alerts, and 20-20-20 break intervals."""
+    """Tracks blink rate (BPM), trend history, dry-eye alerts, and 20-20-20 break intervals."""
 
     def __init__(self, config: Optional[WellnessConfig] = None) -> None:
         self.config = config or WellnessConfig()
@@ -50,6 +51,8 @@ class WellnessMonitor:
     def reset(self, start_time: Optional[float] = None) -> None:
         self._start_ts: Optional[float] = start_time
         self._blink_timestamps: Deque[float] = deque()
+        self._bpm_history: Deque[Tuple[float, float]] = deque(maxlen=180)
+        self._last_history_ts: Optional[float] = None
         self._total_blinks: int = 0
         self._max_bpm: float = 0.0
         self._dry_eye_alerts: int = 0
@@ -63,6 +66,11 @@ class WellnessMonitor:
         self._in_break: bool = False
         self._break_end_ts: Optional[float] = None
         self._breaks_completed: int = 0
+
+    @property
+    def bpm_history(self) -> Sequence[Tuple[float, float]]:
+        """Recent `(timestamp, current_bpm)` points for plotting the blink-rate trend."""
+        return self._bpm_history
 
     def record_blink(self, timestamp: float) -> None:
         """Record a blink timestamp for BPM calculation."""
@@ -88,7 +96,6 @@ class WellnessMonitor:
         while self._blink_timestamps and self._blink_timestamps[0] < cutoff:
             self._blink_timestamps.popleft()
 
-        # Scale BPM proportionally during the initial window so early readings are sensible
         effective_window = min(window, max(elapsed, 1.0))
         if elapsed < 5.0:
             current_bpm = 0.0
@@ -98,6 +105,15 @@ class WellnessMonitor:
         avg_bpm = (self._total_blinks / elapsed) * 60.0 if elapsed >= 5.0 else 0.0
         if current_bpm > self._max_bpm:
             self._max_bpm = current_bpm
+
+        # Record ~1 BPM trend sample per second (or immediately on a blink)
+        if (
+            self._last_history_ts is None
+            or blink_occurred
+            or (timestamp - self._last_history_ts) >= 1.0
+        ):
+            self._last_history_ts = timestamp
+            self._bpm_history.append((timestamp, round(current_bpm, 1)))
 
         # Dry-eye / low blink rate alert
         dry_eye_warning = (
@@ -123,6 +139,7 @@ class WellnessMonitor:
             current_bpm=round(current_bpm, 1),
             avg_bpm=round(avg_bpm, 1),
             max_bpm=round(self._max_bpm, 1),
+            low_bpm_threshold=self.config.low_bpm_threshold,
             dry_eye_warning=dry_eye_warning,
             dry_eye_triggered=dry_eye_triggered,
             dry_eye_alerts=self._dry_eye_alerts,
@@ -245,7 +262,6 @@ def play_alert_sound(kind: str = "gentle") -> None:
                         stderr=subprocess.DEVNULL,
                     )
                     return
-            # Universal fallback: terminal bell
             sys.stdout.write("\a")
             sys.stdout.flush()
         except Exception:

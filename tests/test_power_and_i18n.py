@@ -87,7 +87,7 @@ class TestI18n(unittest.TestCase):
             normalize_language("xx")
 
         tr = Translator("en")
-        self.assertEqual(tr.t("blinks"), "BLINKS")
+        self.assertEqual(tr.t("blinks"), "TOTAL BLINKS")
         seen = [tr.lang]
         for _ in range(len(SUPPORTED_LANGUAGES)):
             seen.append(tr.cycle_language())
@@ -95,7 +95,7 @@ class TestI18n(unittest.TestCase):
         self.assertEqual(set(seen), set(SUPPORTED_LANGUAGES))
 
         tr.set_language("zh")
-        self.assertEqual(tr.t("blinks"), "眨眼次数")
+        self.assertEqual(tr.t("blinks"), "累计眨眼")
         self.assertIn("50%", tr.t("calibrating_banner", pct=50))
 
 

@@ -25,6 +25,7 @@ class TestWellnessMonitor(unittest.TestCase):
             snap = monitor.update(i * 4.0, blink_occurred=True)
         self.assertAlmostEqual(snap.current_bpm, 15.0, delta=1.0)
         self.assertFalse(snap.dry_eye_warning)
+        self.assertGreaterEqual(len(monitor.bpm_history), 15)
 
         # Stop blinking for 65 seconds -> BPM drops to 0 -> triggers dry-eye alert
         snap_low = monitor.update(125.0, blink_occurred=False)

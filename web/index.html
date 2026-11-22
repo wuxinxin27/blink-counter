@@ -13,7 +13,7 @@
         <div class="brand-icon" aria-hidden="true">👁️</div>
         <div>
           <h1 data-i18n="appTitle">Blink Counter</h1>
-          <p class="subtitle" data-i18n="appSubtitle">Real-time webcam blink detector &amp; eye-wellness companion</p>
+          <p class="subtitle" data-i18n="appSubtitle">Real-time blink frequency &amp; eye-wellness tracker</p>
         </div>
       </div>
       <div class="topbar-badges">
@@ -35,7 +35,7 @@
     <div id="alertBanner" class="alert-banner hidden" role="status" aria-live="polite"></div>
 
     <main class="main-grid">
-      <!-- Left: Webcam stage & EAR waveform -->
+      <!-- Left: Webcam stage & Blink Rate Trend chart -->
       <section class="stage-column">
         <div class="card video-card">
           <div class="video-wrapper">
@@ -44,8 +44,8 @@
             <div id="cameraPlaceholder" class="camera-placeholder">
               <div class="placeholder-inner">
                 <div class="placeholder-icon">📷</div>
-                <h2 id="placeholderTitle" data-i18n="placeholderTitle">Start Camera to Track Blinks</h2>
-                <p id="placeholderDesc" data-i18n="placeholderDesc">Runs completely inside your browser on macOS, Linux, and Windows using MediaPipe Face Landmarker. Video never leaves your device.</p>
+                <h2 id="placeholderTitle" data-i18n="placeholderTitle">Start Camera to Track Blink Frequency</h2>
+                <p id="placeholderDesc" data-i18n="placeholderDesc">Runs 100% locally inside your browser on macOS, Linux, and Windows. Video never leaves your device.</p>
                 <button id="startBtnPrimary" class="btn btn-primary btn-lg" data-i18n="startCamera">Start Camera</button>
               </div>
             </div>
@@ -54,7 +54,7 @@
           <div class="controls-bar">
             <button id="toggleCameraBtn" class="btn btn-primary" data-i18n="startCamera">Start Camera</button>
             <button id="pauseBtn" class="btn btn-secondary" disabled data-i18n="pause">Pause</button>
-            <button id="calibrateBtn" class="btn btn-secondary" disabled data-i18n="autoCalibrate">Auto-Calibrate (3s)</button>
+            <button id="calibrateBtn" class="btn btn-secondary" disabled data-i18n="autoCalibrate">Recalibrate</button>
             <button id="resetBtn" class="btn btn-secondary" data-i18n="resetSession">Reset Session</button>
             <div class="spacer"></div>
             <button id="exportCsvBtn" class="btn btn-outline" data-i18n="exportCsv">Export CSV</button>
@@ -64,38 +64,39 @@
 
         <div class="card chart-card">
           <div class="card-header">
-            <h3 data-i18n="chartTitle">Real-Time Eye Aspect Ratio (EAR)</h3>
+            <h3 data-i18n="chartTitle">Blink Frequency Trend (Blinks / Min)</h3>
             <div class="chart-legend">
-              <span><i class="dot dot-ear"></i><span data-i18n="legendEar">Smoothed EAR</span></span>
-              <span><i class="dot dot-thr"></i><span data-i18n="legendThreshold">Blink Threshold</span> (<strong id="legendThreshold">0.21</strong>)</span>
+              <span><i class="dot dot-bpm"></i><span data-i18n="legendBpm">Blink Rate</span></span>
+              <span><i class="dot dot-zone"></i><span data-i18n="legendHealthy">Healthy (15–20)</span></span>
+              <span><i class="dot dot-thr"></i><span data-i18n="legendAlert">Alert (&lt;</span> <strong id="legendLowBpm">10</strong><span>)</span></span>
             </div>
           </div>
-          <canvas id="earChart" width="720" height="160"></canvas>
+          <canvas id="bpmChart" width="720" height="165"></canvas>
         </div>
       </section>
 
-      <!-- Right: Metrics, power saver, settings, and recent blinks -->
+      <!-- Right: Blink frequency metrics, power saver, settings, and recent blinks -->
       <aside class="side-column">
         <section class="metrics-grid">
           <div class="card metric-card highlight">
+            <span class="metric-label" data-i18n="liveBlinkRate">Live Blink Rate</span>
+            <strong id="bpmValue" class="metric-value">0.0</strong>
+            <span id="rateHealthText" class="metric-sub" data-i18n="healthyRange">blinks / min (healthy: 15–20)</span>
+          </div>
+          <div class="card metric-card">
             <span class="metric-label" data-i18n="totalBlinks">Total Blinks</span>
             <strong id="totalBlinksValue" class="metric-value">0</strong>
             <span id="eyeStateText" class="metric-sub" data-i18n="waitingCamera">Waiting for camera</span>
           </div>
           <div class="card metric-card">
-            <span class="metric-label" data-i18n="liveBlinkRate">Live Blink Rate</span>
-            <strong id="bpmValue" class="metric-value">0.0</strong>
-            <span class="metric-sub" data-i18n="healthyRange">blinks / min (healthy: 15–20)</span>
-          </div>
-          <div class="card metric-card">
-            <span class="metric-label" data-i18n="currentEar">Current EAR</span>
-            <strong id="earValue" class="metric-value">0.000</strong>
-            <span id="perclosText" class="metric-sub">PERCLOS: 0.0%</span>
+            <span class="metric-label" data-i18n="avgBlinkRate">Average Rate</span>
+            <strong id="avgBpmValue" class="metric-value">0.0</strong>
+            <span id="peakBpmText" class="metric-sub">Peak: 0.0 BPM</span>
           </div>
           <div class="card metric-card">
             <span class="metric-label" data-i18n="sessionTime">Session Time</span>
             <strong id="sessionTimeValue" class="metric-value">00:00</strong>
-            <span id="avgBpmText" class="metric-sub">Avg: 0.0 BPM</span>
+            <span id="breaksSummaryText" class="metric-sub">Breaks: 0</span>
           </div>
         </section>
 
@@ -139,14 +140,7 @@
 
         <section class="card settings-card">
           <div class="card-header">
-            <h3 data-i18n="settingsTitle">Detection &amp; Alerts</h3>
-          </div>
-          <div class="setting-row">
-            <div class="setting-label">
-              <label for="thresholdSlider" data-i18n="earThresholdLabel">EAR Threshold</label>
-              <span id="thresholdReadout">0.21</span>
-            </div>
-            <input id="thresholdSlider" type="range" min="0.12" max="0.32" step="0.005" value="0.21" />
+            <h3 data-i18n="settingsTitle">Blink Alerts &amp; Preferences</h3>
           </div>
 
           <div class="setting-row">
@@ -165,6 +159,17 @@
             <input id="drowsySlider" type="range" min="0.8" max="3.5" step="0.1" value="1.5" />
           </div>
 
+          <div class="setting-row">
+            <div class="setting-label">
+              <label for="sensitivitySelect" data-i18n="sensitivityLabel">Blink Sensitivity</label>
+              <select id="sensitivitySelect" class="compact-select">
+                <option value="low" data-i18n="sensLow">Low</option>
+                <option value="standard" selected data-i18n="sensStandard">Standard</option>
+                <option value="high" data-i18n="sensHigh">High</option>
+              </select>
+            </div>
+          </div>
+
           <div class="toggles-row">
             <label class="checkbox-label">
               <input id="soundToggle" type="checkbox" checked />
@@ -172,7 +177,7 @@
             </label>
             <label class="checkbox-label">
               <input id="overlayToggle" type="checkbox" checked />
-              <span data-i18n="eyeLandmarks">Eye landmarks</span>
+              <span data-i18n="eyeLandmarks">Eye tracking lines</span>
             </label>
             <label class="checkbox-label">
               <input id="mirrorToggle" type="checkbox" checked />
@@ -193,7 +198,7 @@
                   <th>#</th>
                   <th data-i18n="colTime">Time</th>
                   <th data-i18n="colDuration">Duration</th>
-                  <th data-i18n="colMinEar">Min EAR</th>
+                  <th data-i18n="colRate">Blink Rate</th>
                 </tr>
               </thead>
               <tbody id="blinkLogBody">
@@ -207,7 +212,7 @@
 
     <footer class="footer">
       <span data-i18n="footerLeft">Blink Counter · Open-Source Cross-Platform Project (macOS, Linux &amp; Windows)</span>
-      <span data-i18n="footerRight">Powered by MediaPipe Face Landmarker &amp; Eye Aspect Ratio (EAR)</span>
+      <span data-i18n="footerRight">100% Free &amp; Local Blink Frequency &amp; Eye-Wellness Tracking</span>
     </footer>
   </div>
 

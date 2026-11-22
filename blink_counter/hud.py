@@ -1,4 +1,4 @@
-"""Low-overhead OpenCV HUD with ROI-only blending, real-time EAR graph, and Unicode/CJK i18n."""
+"""Low-overhead OpenCV HUD focused on blink frequency (BPM), ROI blending, and Unicode/CJK i18n."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from .i18n import Translator
 from .wellness import WellnessSnapshot
 
 
-def _format_duration(seconds: float) -> str:
+def format_duration(seconds: float) -> str:
     total = max(0, int(seconds))
     mins, secs = divmod(total, 60)
     hours, mins = divmod(mins, 60)
@@ -132,7 +132,6 @@ def _draw_text_batch(
     for text, (x, y), scale, (b, g, r), _ in items:
         px_size = max(11, int(round(scale * 26)))
         pil_font = _load_pil_font(font_path, px_size)
-        # cv2 uses baseline y; adjust upward so Pillow top-left positioning aligns cleanly
         draw.text((x, max(0, y - int(px_size * 0.85))), text, font=pil_font, fill=(r, g, b))
 
     frame[:] = cv2.cvtColor(np.asarray(pil_img), cv2.COLOR_RGB2BGR)
@@ -146,7 +145,7 @@ def draw_hud(
     translator: Optional[Translator] = None,
     left_eye: Optional[Sequence[Point2D]] = None,
     right_eye: Optional[Sequence[Point2D]] = None,
-    ear_history: Sequence[Tuple[float, float]] = (),
+    bpm_history: Sequence[Tuple[float, float]] = (),
     show_overlay: bool = True,
     show_graph: bool = True,
     paused: bool = False,
@@ -156,14 +155,13 @@ def draw_hud(
     effective_fps: float = 30.0,
     backend_name: str = "",
 ) -> Any:
-    """Render live metrics, eye contours, alert banners, and EAR waveform onto `frame`."""
+    """Render blink frequency (BPM), blink count, eye contours, banners, and BPM trend graph."""
     import cv2
     import numpy as np
 
     tr = translator or Translator("en")
     needs_unicode = tr.lang != "en"
     unicode_ready = _can_render_unicode() if needs_unicode else False
-    # If Pillow/CJK font is absent, fall back to English on the OpenCV canvas to avoid '????'
     canvas_tr = tr if (tr.lang == "en" or unicode_ready) else Translator("en")
 
     h, w = frame.shape[:2]
@@ -179,40 +177,45 @@ def draw_hud(
                 for px, py in pts:
                     cv2.circle(frame, (int(px), int(py)), 2, (255, 255, 255), -1, lineType=cv2.LINE_AA)
 
-    # 2. Top translucent status panel (ROI-only blend, zero full-frame copy)
+    # 2. Top translucent status panel (ROI-only blend, focused on Blink Rate & Count)
     panel_h = 80
     _blend_rect(frame, 0, 0, w, panel_h, (18, 22, 32), 0.78)
 
-    text_items.append((canvas_tr.t("blinks"), (16, 23), 0.48, (150, 165, 190), 1))
-    text_items.append((str(analysis.total_blinks), (16, 64), 1.30, (110, 235, 175), 3))
+    # Primary metric: Live Blink Rate (BPM)
+    bpm_color = (60, 165, 255) if wellness.dry_eye_warning else (110, 235, 175)
+    text_items.append((canvas_tr.t("rate_bpm"), (16, 23), 0.46, (150, 165, 190), 1))
+    bpm_display = f"{wellness.current_bpm:4.1f}" if analysis.face_detected else canvas_tr.t("no_face")
+    text_items.append((bpm_display, (16, 64), 1.20 if analysis.face_detected else 0.78, bpm_color, 3 if analysis.face_detected else 2))
 
-    bpm_color = (60, 165, 255) if wellness.dry_eye_warning else (70, 195, 255)
-    text_items.append((canvas_tr.t("rate_bpm"), (135, 23), 0.46, (150, 165, 190), 1))
-    text_items.append((f"{wellness.current_bpm:4.1f}", (135, 60), 0.95, bpm_color, 2))
+    # Secondary metric: Total Blinks
+    text_items.append((canvas_tr.t("blinks"), (180, 23), 0.46, (150, 165, 190), 1))
+    text_items.append((str(analysis.total_blinks), (180, 62), 1.0, (235, 240, 248), 2))
 
-    ear_color = (82, 95, 255) if analysis.eyes_closed else (235, 240, 248)
-    text_items.append((canvas_tr.t("ear_thr", thr=analysis.threshold), (265, 23), 0.46, (150, 165, 190), 1))
-    ear_text = f"{analysis.smoothed_ear:.3f}" if analysis.face_detected else canvas_tr.t("no_face")
-    text_items.append((ear_text, (265, 60), 0.88, ear_color, 2))
+    # Session Average BPM
+    if w >= 460:
+        text_items.append((canvas_tr.t("avg_bpm"), (305, 23), 0.46, (150, 165, 190), 1))
+        text_items.append((f"{wellness.avg_bpm:4.1f}", (305, 60), 0.88, (70, 195, 255), 2))
 
-    if w >= 520:
-        text_items.append((canvas_tr.t("session"), (420, 23), 0.46, (150, 165, 190), 1))
-        text_items.append((_format_duration(wellness.elapsed_sec), (420, 60), 0.84, (230, 235, 245), 2))
+    # Session Duration
+    if w >= 560:
+        text_items.append((canvas_tr.t("session"), (440, 23), 0.46, (150, 165, 190), 1))
+        text_items.append((format_duration(wellness.elapsed_sec), (440, 60), 0.84, (230, 235, 245), 2))
 
-    if w >= 660 and wellness.break_status.enabled:
-        text_items.append((canvas_tr.t("next_break"), (535, 23), 0.46, (150, 165, 190), 1))
+    # 20-20-20 Next Break
+    if w >= 700 and wellness.break_status.enabled:
+        text_items.append((canvas_tr.t("next_break"), (555, 23), 0.46, (150, 165, 190), 1))
         b_text = (
             canvas_tr.t("break_short", sec=int(wellness.break_status.break_seconds_remaining))
             if wellness.break_status.in_break
-            else _format_duration(wellness.break_status.seconds_until_next_break)
+            else format_duration(wellness.break_status.seconds_until_next_break)
         )
-        text_items.append((b_text, (535, 60), 0.78, (140, 230, 220), 2))
+        text_items.append((b_text, (555, 60), 0.78, (140, 230, 220), 2))
 
     # Top-right status + Eco/Idle badge
     status_label = canvas_tr.t("paused") if paused else (
         canvas_tr.t("muted") if muted else canvas_tr.t("sound_on")
     )
-    text_items.append((status_label, (max(w - 132, 10), 24), 0.46, (185, 200, 225), 1))
+    text_items.append((status_label, (max(w - 128, 10), 24), 0.45, (185, 200, 225), 1))
 
     if idle_mode:
         power_label = canvas_tr.t("idle_badge", fps=effective_fps)
@@ -221,12 +224,10 @@ def draw_hud(
         power_label = canvas_tr.t("eco_badge", fps=effective_fps)
         power_color = (120, 235, 160)
     else:
-        power_label = f"{canvas_tr.language_name}" if backend_name else ""
+        power_label = canvas_tr.language_name if backend_name else ""
         power_color = (135, 155, 180)
     if power_label:
-        text_items.append((power_label, (max(w - 132, 10), 50), 0.44, power_color, 1))
-    if backend_name and w >= 720:
-        text_items.append((backend_name, (max(w - 155, 10), 70), 0.36, (115, 130, 155), 1))
+        text_items.append((power_label, (max(w - 128, 10), 50), 0.44, power_color, 1))
 
     # 3. Alert banners
     banner_y = panel_h + 10
@@ -245,27 +246,28 @@ def draw_hud(
         _blend_rect(frame, 14, banner_y, w - 14, banner_y + 32, (35, 125, 210), 0.86)
         text_items.append((canvas_tr.t("dry_eye_banner", bpm=wellness.current_bpm), (24, banner_y + 22), 0.48, (255, 255, 255), 1))
 
-    # 4. Real-time EAR waveform graph (bottom-right)
-    if show_graph and len(ear_history) >= 2 and w >= 420 and h >= 240:
+    # 4. Real-time Blink Rate (BPM) Trend Graph (bottom-right)
+    if show_graph and len(bpm_history) >= 2 and w >= 420 and h >= 240:
         gw, gh = min(240, w // 3), 88
         gx, gy = w - gw - 14, h - gh - 38
         _blend_rect(frame, gx, gy, gx + gw, gy + gh, (18, 22, 32), 0.78)
         cv2.rectangle(frame, (gx, gy), (gx + gw, gy + gh), (65, 78, 102), 1)
 
-        ear_min, ear_max = 0.08, 0.42
+        recent = list(bpm_history)[-90:]
+        max_bpm = max(30.0, max(v for _, v in recent) + 4.0)
 
         def _to_y(val: float) -> int:
-            norm = max(0.0, min(1.0, (val - ear_min) / (ear_max - ear_min)))
-            return int(gy + gh - 8 - norm * (gh - 20))
+            norm = max(0.0, min(1.0, val / max_bpm))
+            return int(gy + gh - 8 - norm * (gh - 24))
 
-        ty = _to_y(analysis.threshold)
-        cv2.line(frame, (gx + 4, ty), (gx + gw - 4, ty), (70, 175, 255), 1, cv2.LINE_AA)
+        # Low-BPM dry-eye warning threshold line
+        ty = _to_y(wellness.low_bpm_threshold)
+        cv2.line(frame, (gx + 4, ty), (gx + gw - 4, ty), (60, 165, 255), 1, cv2.LINE_AA)
 
-        recent = list(ear_history)[-100:]
         n = len(recent)
         pts = [
-            (int(gx + 6 + (idx / max(1, n - 1)) * (gw - 12)), _to_y(ear_val))
-            for idx, (_, ear_val) in enumerate(recent)
+            (int(gx + 6 + (idx / max(1, n - 1)) * (gw - 12)), _to_y(bpm_val))
+            for idx, (_, bpm_val) in enumerate(recent)
         ]
         if len(pts) >= 2:
             cv2.polylines(
@@ -277,7 +279,7 @@ def draw_hud(
                 lineType=cv2.LINE_AA,
             )
 
-        text_items.append((canvas_tr.t("ear_waveform"), (gx + 8, gy + 15), 0.38, (175, 190, 210), 1))
+        text_items.append((canvas_tr.t("bpm_trend"), (gx + 8, gy + 15), 0.38, (175, 190, 210), 1))
 
     # 5. Bottom hotkey bar
     _blend_rect(frame, 0, h - 28, w, h, (18, 22, 32), 0.78)

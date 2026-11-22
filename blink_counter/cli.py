@@ -11,7 +11,7 @@ from typing import Optional, Sequence
 from . import __version__
 from .config import AppConfig, DetectorConfig, WellnessConfig
 from .detector import BlinkDetector
-from .hud import draw_hud
+from .hud import draw_hud, format_duration
 from .i18n import SUPPORTED_LANGUAGES, Translator
 from .logger import SessionLogger
 from .power import PowerConfig, PowerController, parse_duty_cycle
@@ -386,10 +386,8 @@ def run_desktop(config: AppConfig) -> int:
                         "terminal_line",
                         blinks=analysis.total_blinks,
                         bpm=snap.current_bpm,
-                        ear=analysis.smoothed_ear,
-                        thr=analysis.threshold,
-                        perclos=analysis.perclos,
-                        fps=eff_fps,
+                        avg=snap.avg_bpm,
+                        dur=format_duration(snap.elapsed_sec),
                         status=status_txt,
                     )
                     print(f"\r{line}   ", end="", flush=True)
@@ -401,7 +399,7 @@ def run_desktop(config: AppConfig) -> int:
                     translator=tr,
                     left_eye=extraction.left_eye if extraction else None,
                     right_eye=extraction.right_eye if extraction else None,
-                    ear_history=detector.ear_history,
+                    bpm_history=wellness.bpm_history,
                     show_overlay=show_overlay,
                     show_graph=show_graph,
                     paused=paused,

@@ -8,14 +8,14 @@
 A **cross-platform automatic eye blink counter & eye-wellness tracker** that uses your computer's webcam to count blinks in real time, monitor blink health, prevent dry eyes and fatigue, save laptop battery with **Eco Power-Saving Mode**, and switch languages seamlessly (**English / 简体中文 / 日本語 / Español**).
 
 Includes **two ways to run** in one repository:
-1. **Native Python Desktop & CLI App** (`blink_counter/`) — powered by OpenCV & MediaPipe (`RunningMode.VIDEO` tracking + OpenCV Haar fallback), supporting live HUD, real-time EAR waveform, headless background tracking, Eco power-saving & duty-cycle modes, video-file analysis, and automatic CSV/JSON logging.
+1. **Native Python Desktop & CLI App** (`blink_counter/`) — powered by OpenCV & MediaPipe (`RunningMode.VIDEO` tracking + OpenCV Haar fallback), supporting a clean blink-frequency HUD, live BPM trend chart, headless background tracking, Eco power-saving & duty-cycle modes, video-file analysis, and automatic CSV/JSON logging.
 2. **Zero-Install Browser Web App** (`web/`) — powered by MediaPipe Face Landmarker in WebAssembly. Runs 100% locally in Chrome, Edge, Safari, or Firefox on macOS, Linux, and Windows, and is hosted live on GitHub Pages.
 
 ---
 
 ## ✨ Features
 
-- **Automatic Real-Time Blink Counting**: Computes the **Eye Aspect Ratio (EAR)** from 6 eye landmarks per eye with EMA smoothing, hysteresis, duration bounds, and cooldown filtering.
+- **Blink-Frequency-First Interface**: Focuses directly on what matters to users — **Live Blink Rate (BPM)**, **Total Blinks**, **Average Rate**, and a **Blink Frequency Trend Chart** with a shaded healthy zone (15–20 BPM) and automatic calibration under the hood.
 - **⚡ Eco Power-Saving Mode & Duty-Cycle Sampling**:
   - Caps inference to **15 FPS** (a 150–300 ms blink still spans 2–5 frames reliably).
   - Downscales capture & inference frames (`480×270` / `280px` width) and uses `RunningMode.VIDEO` temporal tracking.
