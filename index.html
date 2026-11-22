@@ -12,13 +12,23 @@
       <div class="brand">
         <div class="brand-icon" aria-hidden="true">👁️</div>
         <div>
-          <h1>Blink Counter</h1>
-          <p class="subtitle">Real-time webcam blink detector &amp; eye-wellness companion</p>
+          <h1 data-i18n="appTitle">Blink Counter</h1>
+          <p class="subtitle" data-i18n="appSubtitle">Real-time webcam blink detector &amp; eye-wellness companion</p>
         </div>
       </div>
       <div class="topbar-badges">
-        <span class="pill pill-privacy">🔒 100% Local Processing</span>
-        <span id="statusBadge" class="pill pill-idle">Ready</span>
+        <label class="lang-picker" for="langSelect">
+          <span aria-hidden="true">🌐</span>
+          <select id="langSelect" aria-label="Language">
+            <option value="en">English</option>
+            <option value="zh">简体中文</option>
+            <option value="ja">日本語</option>
+            <option value="es">Español</option>
+          </select>
+        </label>
+        <span id="powerBadge" class="pill pill-eco">⚡ Eco · 15 FPS</span>
+        <span class="pill pill-privacy" data-i18n="privacyBadge">🔒 100% Local Processing</span>
+        <span id="statusBadge" class="pill pill-idle" data-i18n="statusReady">Ready</span>
       </div>
     </header>
 
@@ -34,64 +44,85 @@
             <div id="cameraPlaceholder" class="camera-placeholder">
               <div class="placeholder-inner">
                 <div class="placeholder-icon">📷</div>
-                <h2>Start Camera to Track Blinks</h2>
-                <p>Runs completely inside your browser on macOS, Linux, and Windows using MediaPipe Face Landmarker. Video never leaves your device.</p>
-                <button id="startBtnPrimary" class="btn btn-primary btn-lg">Start Camera</button>
+                <h2 id="placeholderTitle" data-i18n="placeholderTitle">Start Camera to Track Blinks</h2>
+                <p id="placeholderDesc" data-i18n="placeholderDesc">Runs completely inside your browser on macOS, Linux, and Windows using MediaPipe Face Landmarker. Video never leaves your device.</p>
+                <button id="startBtnPrimary" class="btn btn-primary btn-lg" data-i18n="startCamera">Start Camera</button>
               </div>
             </div>
           </div>
 
           <div class="controls-bar">
-            <button id="toggleCameraBtn" class="btn btn-primary">Start Camera</button>
-            <button id="pauseBtn" class="btn btn-secondary" disabled>Pause</button>
-            <button id="calibrateBtn" class="btn btn-secondary" disabled>Auto-Calibrate (3s)</button>
-            <button id="resetBtn" class="btn btn-secondary">Reset Session</button>
+            <button id="toggleCameraBtn" class="btn btn-primary" data-i18n="startCamera">Start Camera</button>
+            <button id="pauseBtn" class="btn btn-secondary" disabled data-i18n="pause">Pause</button>
+            <button id="calibrateBtn" class="btn btn-secondary" disabled data-i18n="autoCalibrate">Auto-Calibrate (3s)</button>
+            <button id="resetBtn" class="btn btn-secondary" data-i18n="resetSession">Reset Session</button>
             <div class="spacer"></div>
-            <button id="exportCsvBtn" class="btn btn-outline">Export CSV</button>
-            <button id="exportJsonBtn" class="btn btn-outline">Export JSON</button>
+            <button id="exportCsvBtn" class="btn btn-outline" data-i18n="exportCsv">Export CSV</button>
+            <button id="exportJsonBtn" class="btn btn-outline" data-i18n="exportJson">Export JSON</button>
           </div>
         </div>
 
         <div class="card chart-card">
           <div class="card-header">
-            <h3>Real-Time Eye Aspect Ratio (EAR)</h3>
+            <h3 data-i18n="chartTitle">Real-Time Eye Aspect Ratio (EAR)</h3>
             <div class="chart-legend">
-              <span><i class="dot dot-ear"></i>Smoothed EAR</span>
-              <span><i class="dot dot-thr"></i>Blink Threshold (<strong id="legendThreshold">0.21</strong>)</span>
+              <span><i class="dot dot-ear"></i><span data-i18n="legendEar">Smoothed EAR</span></span>
+              <span><i class="dot dot-thr"></i><span data-i18n="legendThreshold">Blink Threshold</span> (<strong id="legendThreshold">0.21</strong>)</span>
             </div>
           </div>
           <canvas id="earChart" width="720" height="160"></canvas>
         </div>
       </section>
 
-      <!-- Right: Metrics, settings, and recent blinks -->
+      <!-- Right: Metrics, power saver, settings, and recent blinks -->
       <aside class="side-column">
         <section class="metrics-grid">
           <div class="card metric-card highlight">
-            <span class="metric-label">Total Blinks</span>
+            <span class="metric-label" data-i18n="totalBlinks">Total Blinks</span>
             <strong id="totalBlinksValue" class="metric-value">0</strong>
-            <span id="eyeStateText" class="metric-sub">Waiting for camera</span>
+            <span id="eyeStateText" class="metric-sub" data-i18n="waitingCamera">Waiting for camera</span>
           </div>
           <div class="card metric-card">
-            <span class="metric-label">Live Blink Rate</span>
+            <span class="metric-label" data-i18n="liveBlinkRate">Live Blink Rate</span>
             <strong id="bpmValue" class="metric-value">0.0</strong>
-            <span class="metric-sub">blinks / min (healthy: 15–20)</span>
+            <span class="metric-sub" data-i18n="healthyRange">blinks / min (healthy: 15–20)</span>
           </div>
           <div class="card metric-card">
-            <span class="metric-label">Current EAR</span>
+            <span class="metric-label" data-i18n="currentEar">Current EAR</span>
             <strong id="earValue" class="metric-value">0.000</strong>
             <span id="perclosText" class="metric-sub">PERCLOS: 0.0%</span>
           </div>
           <div class="card metric-card">
-            <span class="metric-label">Session Time</span>
+            <span class="metric-label" data-i18n="sessionTime">Session Time</span>
             <strong id="sessionTimeValue" class="metric-value">00:00</strong>
             <span id="avgBpmText" class="metric-sub">Avg: 0.0 BPM</span>
           </div>
         </section>
 
+        <section class="card power-card">
+          <div class="card-header">
+            <h3 data-i18n="powerTitle">⚡ Power Saver (Eco Mode)</h3>
+            <label class="switch">
+              <input id="ecoToggle" type="checkbox" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <p id="powerHint" class="metric-sub" data-i18n="powerHint">Caps inference to 15 FPS, uses 480×270 video, and drops to 1.5 FPS when you step away.</p>
+          <div class="toggles-row">
+            <label class="checkbox-label">
+              <input id="idleBackoffToggle" type="checkbox" checked />
+              <span data-i18n="idleBackoffLabel">No-face idle backoff (1.5 FPS)</span>
+            </label>
+            <label class="checkbox-label">
+              <input id="dutyCycleToggle" type="checkbox" />
+              <span data-i18n="dutyCycleLabel">Duty-cycle sampling (60s on / 240s camera off)</span>
+            </label>
+          </div>
+        </section>
+
         <section class="card break-card">
           <div class="card-header">
-            <h3>20-20-20 Eye Break Timer</h3>
+            <h3 data-i18n="breakTitle">20-20-20 Eye Break Timer</h3>
             <label class="switch">
               <input id="breakToggle" type="checkbox" checked />
               <span class="slider"></span>
@@ -100,19 +131,19 @@
           <div class="break-body">
             <div>
               <div id="breakTimerValue" class="break-timer">20:00</div>
-              <p id="breakHint" class="metric-sub">Every 20 min, look 20 ft (6 m) away for 20 sec.</p>
+              <p id="breakHint" class="metric-sub" data-i18n="breakHintDefault">Every 20 min, look 20 ft (6 m) away for 20 sec.</p>
             </div>
-            <button id="takeBreakNowBtn" class="btn btn-outline btn-sm">Start 20s Break</button>
+            <button id="takeBreakNowBtn" class="btn btn-outline btn-sm" data-i18n="startBreakNow">Start 20s Break</button>
           </div>
         </section>
 
         <section class="card settings-card">
           <div class="card-header">
-            <h3>Detection &amp; Alerts</h3>
+            <h3 data-i18n="settingsTitle">Detection &amp; Alerts</h3>
           </div>
           <div class="setting-row">
             <div class="setting-label">
-              <label for="thresholdSlider">EAR Threshold</label>
+              <label for="thresholdSlider" data-i18n="earThresholdLabel">EAR Threshold</label>
               <span id="thresholdReadout">0.21</span>
             </div>
             <input id="thresholdSlider" type="range" min="0.12" max="0.32" step="0.005" value="0.21" />
@@ -120,7 +151,7 @@
 
           <div class="setting-row">
             <div class="setting-label">
-              <label for="lowBpmSlider">Dry-Eye Alert Below (BPM)</label>
+              <label for="lowBpmSlider" data-i18n="lowBpmLabel">Dry-Eye Alert Below (BPM)</label>
               <span id="lowBpmReadout">10</span>
             </div>
             <input id="lowBpmSlider" type="range" min="4" max="18" step="1" value="10" />
@@ -128,7 +159,7 @@
 
           <div class="setting-row">
             <div class="setting-label">
-              <label for="drowsySlider">Drowsiness Closure (sec)</label>
+              <label for="drowsySlider" data-i18n="drowsyLabel">Drowsiness Closure (sec)</label>
               <span id="drowsyReadout">1.5s</span>
             </div>
             <input id="drowsySlider" type="range" min="0.8" max="3.5" step="0.1" value="1.5" />
@@ -137,36 +168,36 @@
           <div class="toggles-row">
             <label class="checkbox-label">
               <input id="soundToggle" type="checkbox" checked />
-              <span>Sound alerts</span>
+              <span data-i18n="soundAlerts">Sound alerts</span>
             </label>
             <label class="checkbox-label">
               <input id="overlayToggle" type="checkbox" checked />
-              <span>Eye landmarks</span>
+              <span data-i18n="eyeLandmarks">Eye landmarks</span>
             </label>
             <label class="checkbox-label">
               <input id="mirrorToggle" type="checkbox" checked />
-              <span>Mirror video</span>
+              <span data-i18n="mirrorVideo">Mirror video</span>
             </label>
           </div>
         </section>
 
         <section class="card log-card">
           <div class="card-header">
-            <h3>Recent Blinks</h3>
-            <span id="logCountBadge" class="muted">0 events</span>
+            <h3 data-i18n="recentBlinks">Recent Blinks</h3>
+            <span id="logCountBadge" class="muted">0</span>
           </div>
           <div class="log-table-wrap">
             <table class="log-table">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Time</th>
-                  <th>Duration</th>
-                  <th>Min EAR</th>
+                  <th data-i18n="colTime">Time</th>
+                  <th data-i18n="colDuration">Duration</th>
+                  <th data-i18n="colMinEar">Min EAR</th>
                 </tr>
               </thead>
               <tbody id="blinkLogBody">
-                <tr><td colspan="4" class="empty-row">No blinks recorded yet.</td></tr>
+                <tr><td colspan="4" class="empty-row" data-i18n="noBlinksYet">No blinks recorded yet.</td></tr>
               </tbody>
             </table>
           </div>
@@ -175,8 +206,8 @@
     </main>
 
     <footer class="footer">
-      <span>Blink Counter · Open-Source Cross-Platform Project (macOS, Linux &amp; Windows)</span>
-      <span>Powered by MediaPipe Face Landmarker &amp; Eye Aspect Ratio (EAR)</span>
+      <span data-i18n="footerLeft">Blink Counter · Open-Source Cross-Platform Project (macOS, Linux &amp; Windows)</span>
+      <span data-i18n="footerRight">Powered by MediaPipe Face Landmarker &amp; Eye Aspect Ratio (EAR)</span>
     </footer>
   </div>
 
