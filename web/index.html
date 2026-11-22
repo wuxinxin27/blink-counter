@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blink Counter — Cross-Platform Eye Wellness Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">👁️</div>
+        <div>
+          <h1>Blink Counter</h1>
+          <p class="subtitle">Real-time webcam blink detector &amp; eye-wellness companion</p>
+        </div>
+      </div>
+      <div class="topbar-badges">
+        <span class="pill pill-privacy">🔒 100% Local Processing</span>
+        <span id="statusBadge" class="pill pill-idle">Ready</span>
+      </div>
+    </header>
+
+    <div id="alertBanner" class="alert-banner hidden" role="status" aria-live="polite"></div>
+
+    <main class="main-grid">
+      <!-- Left: Webcam stage & EAR waveform -->
+      <section class="stage-column">
+        <div class="card video-card">
+          <div class="video-wrapper">
+            <video id="webcam" autoplay playsinline muted></video>
+            <canvas id="overlayCanvas"></canvas>
+            <div id="cameraPlaceholder" class="camera-placeholder">
+              <div class="placeholder-inner">
+                <div class="placeholder-icon">📷</div>
+                <h2>Start Camera to Track Blinks</h2>
+                <p>Runs completely inside your browser on macOS, Linux, and Windows using MediaPipe Face Landmarker. Video never leaves your device.</p>
+                <button id="startBtnPrimary" class="btn btn-primary btn-lg">Start Camera</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="controls-bar">
+            <button id="toggleCameraBtn" class="btn btn-primary">Start Camera</button>
+            <button id="pauseBtn" class="btn btn-secondary" disabled>Pause</button>
+            <button id="calibrateBtn" class="btn btn-secondary" disabled>Auto-Calibrate (3s)</button>
+            <button id="resetBtn" class="btn btn-secondary">Reset Session</button>
+            <div class="spacer"></div>
+            <button id="exportCsvBtn" class="btn btn-outline">Export CSV</button>
+            <button id="exportJsonBtn" class="btn btn-outline">Export JSON</button>
+          </div>
+        </div>
+
+        <div class="card chart-card">
+          <div class="card-header">
+            <h3>Real-Time Eye Aspect Ratio (EAR)</h3>
+            <div class="chart-legend">
+              <span><i class="dot dot-ear"></i>Smoothed EAR</span>
+              <span><i class="dot dot-thr"></i>Blink Threshold (<strong id="legendThreshold">0.21</strong>)</span>
+            </div>
+          </div>
+          <canvas id="earChart" width="720" height="160"></canvas>
+        </div>
+      </section>
+
+      <!-- Right: Metrics, settings, and recent blinks -->
+      <aside class="side-column">
+        <section class="metrics-grid">
+          <div class="card metric-card highlight">
+            <span class="metric-label">Total Blinks</span>
+            <strong id="totalBlinksValue" class="metric-value">0</strong>
+            <span id="eyeStateText" class="metric-sub">Waiting for camera</span>
+          </div>
+          <div class="card metric-card">
+            <span class="metric-label">Live Blink Rate</span>
+            <strong id="bpmValue" class="metric-value">0.0</strong>
+            <span class="metric-sub">blinks / min (healthy: 15–20)</span>
+          </div>
+          <div class="card metric-card">
+            <span class="metric-label">Current EAR</span>
+            <strong id="earValue" class="metric-value">0.000</strong>
+            <span id="perclosText" class="metric-sub">PERCLOS: 0.0%</span>
+          </div>
+          <div class="card metric-card">
+            <span class="metric-label">Session Time</span>
+            <strong id="sessionTimeValue" class="metric-value">00:00</strong>
+            <span id="avgBpmText" class="metric-sub">Avg: 0.0 BPM</span>
+          </div>
+        </section>
+
+        <section class="card break-card">
+          <div class="card-header">
+            <h3>20-20-20 Eye Break Timer</h3>
+            <label class="switch">
+              <input id="breakToggle" type="checkbox" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="break-body">
+            <div>
+              <div id="breakTimerValue" class="break-timer">20:00</div>
+              <p id="breakHint" class="metric-sub">Every 20 min, look 20 ft (6 m) away for 20 sec.</p>
+            </div>
+            <button id="takeBreakNowBtn" class="btn btn-outline btn-sm">Start 20s Break</button>
+          </div>
+        </section>
+
+        <section class="card settings-card">
+          <div class="card-header">
+            <h3>Detection &amp; Alerts</h3>
+          </div>
+          <div class="setting-row">
+            <div class="setting-label">
+              <label for="thresholdSlider">EAR Threshold</label>
+              <span id="thresholdReadout">0.21</span>
+            </div>
+            <input id="thresholdSlider" type="range" min="0.12" max="0.32" step="0.005" value="0.21" />
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <label for="lowBpmSlider">Dry-Eye Alert Below (BPM)</label>
+              <span id="lowBpmReadout">10</span>
+            </div>
+            <input id="lowBpmSlider" type="range" min="4" max="18" step="1" value="10" />
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-label">
+              <label for="drowsySlider">Drowsiness Closure (sec)</label>
+              <span id="drowsyReadout">1.5s</span>
+            </div>
+            <input id="drowsySlider" type="range" min="0.8" max="3.5" step="0.1" value="1.5" />
+          </div>
+
+          <div class="toggles-row">
+            <label class="checkbox-label">
+              <input id="soundToggle" type="checkbox" checked />
+              <span>Sound alerts</span>
+            </label>
+            <label class="checkbox-label">
+              <input id="overlayToggle" type="checkbox" checked />
+              <span>Eye landmarks</span>
+            </label>
+            <label class="checkbox-label">
+              <input id="mirrorToggle" type="checkbox" checked />
+              <span>Mirror video</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="card log-card">
+          <div class="card-header">
+            <h3>Recent Blinks</h3>
+            <span id="logCountBadge" class="muted">0 events</span>
+          </div>
+          <div class="log-table-wrap">
+            <table class="log-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Time</th>
+                  <th>Duration</th>
+                  <th>Min EAR</th>
+                </tr>
+              </thead>
+              <tbody id="blinkLogBody">
+                <tr><td colspan="4" class="empty-row">No blinks recorded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <span>Blink Counter · Open-Source Cross-Platform Project (macOS, Linux &amp; Windows)</span>
+      <span>Powered by MediaPipe Face Landmarker &amp; Eye Aspect Ratio (EAR)</span>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

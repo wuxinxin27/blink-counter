@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blink-counter"
+version = "1.0.0"
+description = "Cross-platform automatic eye blink counter and eye-wellness tracker (macOS, Linux, Windows + Browser Web App)."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+authors = [
+  { name = "Wu Ruixin" }
+]
+keywords = ["blink-counter", "opencv", "mediapipe", "eye-aspect-ratio", "eye-health", "computer-vision"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: End Users/Desktop",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Video :: Capture",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+]
+dependencies = [
+  "opencv-python>=4.8.0",
+  "mediapipe>=0.10.9",
+  "numpy>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/wuxinxin27/blink-counter"
+Repository = "https://github.com/wuxinxin27/blink-counter"
+Issues = "https://github.com/wuxinxin27/blink-counter/issues"
+
+[project.scripts]
+blink-counter = "blink_counter.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["blink_counter*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
