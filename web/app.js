@@ -103,6 +103,7 @@ const I18N = {
     sensStandard: "Standard",
     sensHigh: "High",
     soundAlerts: "Sound alerts",
+    autostartLabel: "Launch at login",
     popupAlerts: "Pop-up & system alerts",
     testAlert: "🔔 Test Pop-up & Sound",
     modalDismiss: "Got it",
@@ -206,6 +207,7 @@ const I18N = {
     sensStandard: "标准",
     sensHigh: "高",
     soundAlerts: "提示音",
+    autostartLabel: "开机自启动",
     popupAlerts: "弹窗与系统通知提醒",
     testAlert: "🔔 测试弹窗与音效",
     modalDismiss: "知道了",
@@ -309,6 +311,7 @@ const I18N = {
     sensStandard: "標準",
     sensHigh: "高",
     soundAlerts: "音声アラート",
+    autostartLabel: "ログイン時に自動起動",
     popupAlerts: "ポップアップ＆システム通知",
     testAlert: "🔔 ポップアップ＆音テスト",
     modalDismiss: "OK",
@@ -412,6 +415,7 @@ const I18N = {
     sensStandard: "Estándar",
     sensHigh: "Alta",
     soundAlerts: "Sonido",
+    autostartLabel: "Iniciar al encender",
     popupAlerts: "Ventanas emergentes y notificaciones",
     testAlert: "🔔 Probar Aviso y Sonido",
     modalDismiss: "Entendido",
@@ -544,6 +548,10 @@ const DUTY_OFF_MS = 240 * 1000;
 
 const state = {
   sessionStartMs: null,
+  activeWindowStartMs: null,
+  activeMonitoringMs: 0,
+  lastActiveTickMs: null,
+  cameraWarmupUntilMs: 0,
   totalBlinks: 0,
   drowsyEvents: 0,
   dryEyeAlerts: 0,
@@ -854,9 +862,29 @@ function setStatusBadge(label, cls) {
   statusBadge.className = `pill ${cls}`;
 }
 
+function resetTransientDetection(nowMs, warmupMs = 1500) {
+  state.smoothedSignal = null;
+  state.eyesClosed = false;
+  state.closedFrames = 0;
+  state.closureStartMs = null;
+  state.drowsyTriggeredForClosure = false;
+  state.cameraWarmupUntilMs = nowMs + warmupMs;
+}
+
+function beginActiveMonitoringWindow(nowMs, warmupMs = 1500) {
+  resetTransientDetection(nowMs, warmupMs);
+  state.activeWindowStartMs = nowMs;
+  state.lastActiveTickMs = nowMs;
+  state.blinkTimestamps = [];
+}
+
 function resetSession(keepCalibration = true) {
   const now = performance.now();
   state.sessionStartMs = running ? now : null;
+  state.activeWindowStartMs = running ? now : null;
+  state.activeMonitoringMs = 0;
+  state.lastActiveTickMs = running ? now : null;
+  state.cameraWarmupUntilMs = running ? now + 1500 : 0;
   state.totalBlinks = 0;
   state.drowsyEvents = 0;
   state.dryEyeAlerts = 0;
@@ -966,13 +994,16 @@ function releaseMediaStream() {
 
 function enterDutySleep() {
   inDutySleep = true;
-  state.dutyPhaseStartMs = performance.now();
+  const sleepStart = performance.now();
+  state.dutyPhaseStartMs = sleepStart;
+  resetTransientDetection(sleepStart, 0);
   cancelLoop();
   releaseMediaStream();
   updateVideoVisibilityUI();
   placeholderEl.classList.remove("hidden");
   startBtnPrimary.classList.add("hidden");
   setStatusBadge(t("statusDutySleep"), "pill-eco");
+  setBanner(null, "");
 
   const tickSleep = async () => {
     if (!running || !inDutySleep) return;
@@ -985,10 +1016,12 @@ function enterDutySleep() {
         await openMediaStream();
         placeholderEl.classList.add("hidden");
         updateVideoVisibilityUI();
-        state.dutyPhaseStartMs = performance.now();
-        state.lastFaceMs = performance.now();
+        const wakeNow = performance.now();
+        state.dutyPhaseStartMs = wakeNow;
+        state.lastFaceMs = wakeNow;
+        beginActiveMonitoringWindow(wakeNow, 2000);
         setStatusBadge(t("statusLive"), "pill-live");
-        updatePowerBadge(performance.now());
+        updatePowerBadge(wakeNow);
         scheduleNextTick();
       } catch (err) {
         stopCamera();
@@ -1023,6 +1056,7 @@ async function startCamera() {
     state.lastFaceMs = now;
     state.dutyPhaseStartMs = now;
     if (state.sessionStartMs === null) state.sessionStartMs = now;
+    beginActiveMonitoringWindow(now, 1500);
     if (state.nextBreakMs === null) state.nextBreakMs = now + 20 * 60 * 1000;
 
     toggleCameraBtn.textContent = t("stopCamera");
@@ -1288,13 +1322,24 @@ function processFrame(nowMs, isBackground = false) {
   let drowsyNow = false;
   let closureMs = 0;
 
-  // Compute current rolling BPM up front so newly logged blinks carry accurate rate
+  // Accumulate active monitoring time (excluding duty-cycle camera-off sleep & pause)
+  if (state.activeWindowStartMs === null) state.activeWindowStartMs = nowMs;
+  if (state.lastActiveTickMs !== null) {
+    const dtMs = Math.max(0, Math.min(2000, nowMs - state.lastActiveTickMs));
+    state.activeMonitoringMs += dtMs;
+  }
+  state.lastActiveTickMs = nowMs;
+
   const elapsedSec = Math.max(0, (nowMs - state.sessionStartMs) / 1000);
+  const activeWindowSec = Math.max(0, (nowMs - state.activeWindowStartMs) / 1000);
+  const activeTotalSec = Math.max(activeWindowSec, state.activeMonitoringMs / 1000);
+  const inCameraWarmup = nowMs < state.cameraWarmupUntilMs;
+
   const bpmCutoff = nowMs - 60000;
   while (state.blinkTimestamps.length && state.blinkTimestamps[0] < bpmCutoff) {
     state.blinkTimestamps.shift();
   }
-  const effWindow = Math.min(60, Math.max(elapsedSec, 1));
+  const effWindow = Math.min(60, Math.max(activeWindowSec, 1));
 
   if (!result.faceLandmarks || result.faceLandmarks.length === 0) {
     overlayCtx.clearRect(0, 0, width, height);
@@ -1333,7 +1378,7 @@ function processFrame(nowMs, isBackground = false) {
     const drowsyLimitMs = parseFloat(drowsySlider.value) * 1000;
 
     if (!state.eyesClosed) {
-      if (state.smoothedSignal < closeThr) {
+      if (!inCameraWarmup && state.smoothedSignal < closeThr) {
         state.eyesClosed = true;
         state.closedFrames = 1;
         state.closureStartMs = nowMs;
@@ -1348,7 +1393,7 @@ function processFrame(nowMs, isBackground = false) {
         state.blinkTimestamps.push(nowMs);
         blinkThisFrame = true;
 
-        const rateNow = elapsedSec < 5 ? 0 : (state.blinkTimestamps.length / effWindow) * 60;
+        const rateNow = activeWindowSec < 5 ? 0 : (state.blinkTimestamps.length / effWindow) * 60;
         const rec = {
           blink_index: state.totalBlinks,
           iso_time: new Date().toISOString(),
@@ -1367,7 +1412,7 @@ function processFrame(nowMs, isBackground = false) {
     } else {
       state.closedFrames += 1;
       closureMs = Math.max(0, nowMs - state.closureStartMs);
-      if (!state.calibrating && closureMs >= drowsyLimitMs) {
+      if (!state.calibrating && !inCameraWarmup && closureMs >= drowsyLimitMs) {
         drowsyNow = true;
         if (!state.drowsyTriggeredForClosure) {
           state.drowsyTriggeredForClosure = true;
@@ -1390,8 +1435,8 @@ function processFrame(nowMs, isBackground = false) {
     }
   }
 
-  const currentBpm = elapsedSec < 5 ? 0 : (state.blinkTimestamps.length / effWindow) * 60;
-  const avgBpm = elapsedSec < 5 ? 0 : (state.totalBlinks / elapsedSec) * 60;
+  const currentBpm = activeWindowSec < 5 ? 0 : (state.blinkTimestamps.length / effWindow) * 60;
+  const avgBpm = activeTotalSec < 5 ? 0 : (state.totalBlinks / activeTotalSec) * 60;
   if (currentBpm > state.maxBpm) state.maxBpm = currentBpm;
 
   // Record 1 BPM trend sample per second; skip chart painting while minimized
@@ -1423,7 +1468,8 @@ function processFrame(nowMs, isBackground = false) {
 
   const breakMsg = updateBreakTimer(nowMs);
   const lowBpmLimit = parseFloat(lowBpmSlider.value);
-  const dryEyeWarn = elapsedSec >= 30 && currentBpm < lowBpmLimit;
+  // Require at least 30s of active camera monitoring in the current sampling window before alerting low BPM
+  const dryEyeWarn = !state.calibrating && activeWindowSec >= 30 && currentBpm < lowBpmLimit;
   if (dryEyeWarn && (state.lastDryEyeAlertMs === null || nowMs - state.lastDryEyeAlertMs >= 45000)) {
     state.lastDryEyeAlertMs = nowMs;
     state.dryEyeAlerts += 1;
@@ -1435,7 +1481,7 @@ function processFrame(nowMs, isBackground = false) {
     });
   }
 
-  if (elapsedSec < 5) {
+  if (activeWindowSec < 5) {
     rateHealthText.textContent = t("rateWarmup");
   } else if (dryEyeWarn) {
     rateHealthText.textContent = t("rateLow");
@@ -1479,6 +1525,7 @@ function exportCsv() {
 
 function exportJson() {
   const elapsedSec = state.sessionStartMs ? (performance.now() - state.sessionStartMs) / 1000 : 0;
+  const activeSec = Math.max(0, state.activeMonitoringMs / 1000);
   const payload = {
     exported_at: new Date().toISOString(),
     language: currentLang,
@@ -1486,7 +1533,8 @@ function exportJson() {
     metrics: {
       total_blinks: state.totalBlinks,
       duration_sec: Number(elapsedSec.toFixed(2)),
-      avg_bpm: elapsedSec >= 5 ? Number(((state.totalBlinks / elapsedSec) * 60).toFixed(1)) : 0,
+      active_monitoring_sec: Number(activeSec.toFixed(2)),
+      avg_bpm: activeSec >= 5 ? Number(((state.totalBlinks / activeSec) * 60).toFixed(1)) : 0,
       max_bpm: Number(state.maxBpm.toFixed(1)),
       drowsy_events: state.drowsyEvents,
       dry_eye_alerts: state.dryEyeAlerts,
@@ -1537,6 +1585,12 @@ toggleCameraBtn.addEventListener("click", () => (running ? stopCamera() : startC
 startBtnPrimary.addEventListener("click", startCamera);
 pauseBtn.addEventListener("click", () => {
   paused = !paused;
+  const now = performance.now();
+  if (paused) {
+    resetTransientDetection(now, 0);
+  } else {
+    beginActiveMonitoringWindow(now, 1000);
+  }
   pauseBtn.textContent = paused ? t("resume") : t("pause");
   setStatusBadge(paused ? t("statusPaused") : t("statusLive"), paused ? "pill-warn" : "pill-live");
 });
@@ -1601,9 +1655,11 @@ videoWrapper.classList.add("mirrored");
 applyStaticTranslations();
 drawBpmChart();
 
-// Progressive Web App (PWA) install support & Tauri Desktop Tray controls
+// Progressive Web App (PWA) install support & Tauri Desktop Tray / Autostart controls
 const installAppBtn = document.getElementById("installAppBtn");
 const minimizeTrayBtn = document.getElementById("minimizeTrayBtn");
+const autostartRow = document.getElementById("autostartRow");
+const autostartToggle = document.getElementById("autostartToggle");
 let deferredInstallPrompt = null;
 
 if (isTauriDesktop) {
@@ -1611,6 +1667,26 @@ if (isTauriDesktop) {
     minimizeTrayBtn.classList.remove("hidden");
     minimizeTrayBtn.addEventListener("click", () => {
       tauriCore.invoke("minimize_to_tray").catch(() => {});
+    });
+  }
+  if (autostartRow && autostartToggle) {
+    autostartRow.classList.remove("hidden");
+    tauriCore
+      .invoke("get_autostart")
+      .then((enabled) => {
+        autostartToggle.checked = Boolean(enabled);
+      })
+      .catch(() => {});
+    autostartToggle.addEventListener("change", () => {
+      const desired = autostartToggle.checked;
+      tauriCore
+        .invoke("set_autostart", { enabled: desired })
+        .then((actual) => {
+          autostartToggle.checked = Boolean(actual);
+        })
+        .catch(() => {
+          autostartToggle.checked = !desired;
+        });
     });
   }
   if (tauriEvent) {

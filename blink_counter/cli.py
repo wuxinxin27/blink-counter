@@ -304,6 +304,9 @@ def run_desktop(config: AppConfig) -> int:
                     in_duty_sleep = False
                     print("\n" + tr.t("duty_wake_msg", sec=int(round(duty.phase_remaining_sec))))
                     cap = _open_cam()
+                    wake_ts = time.monotonic()
+                    detector.reset_transient_state(wake_ts, warmup_sec=1.5)
+                    wellness.begin_active_window(wake_ts)
 
             # Frame-rate pacing to avoid redundant inference and CPU wakeups
             if config.video_source is None and not power.should_process(now):
@@ -569,6 +572,9 @@ def _handle_hotkey(
         detector.start_calibration()
     elif key in (ord("p"), ord("P")):
         state["paused"] = not state["paused"]
+        if not state["paused"]:
+            detector.reset_transient_state(now, warmup_sec=1.0)
+            wellness.begin_active_window(now)
     elif key in (ord("m"), ord("M")):
         state["muted"] = not state["muted"]
     elif key in (ord("h"), ord("H")):

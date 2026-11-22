@@ -151,6 +151,23 @@ class TestBlinkDetector(unittest.TestCase):
         self.assertFalse(res.face_detected)
         self.assertFalse(res.eyes_closed)
 
+    def test_reset_transient_state_prevents_false_drowsy_after_duty_sleep(self) -> None:
+        cfg = DetectorConfig(
+            ear_threshold=0.21,
+            smoothing_alpha=1.0,
+            drowsy_duration_ms=1000.0,
+            auto_calibrate=False,
+        )
+        detector = BlinkDetector(cfg)
+        # Eyes closed just before camera entered 240s duty-cycle sleep
+        detector.update_ear(0.12, 0.12, 10.0)
+        # Camera wakes at t=250.0 -> reset transient state with 1.5s warmup
+        detector.reset_transient_state(250.0, warmup_sec=1.5)
+        res_wake = detector.update_ear(0.12, 0.12, 250.2)
+        self.assertFalse(res_wake.is_drowsy)
+        self.assertFalse(res_wake.drowsy_triggered)
+        self.assertEqual(detector.drowsy_events, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

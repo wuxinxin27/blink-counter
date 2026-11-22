@@ -54,6 +54,9 @@ class WellnessMonitor:
 
     def reset(self, start_time: Optional[float] = None) -> None:
         self._start_ts: Optional[float] = start_time
+        self._window_start_ts: Optional[float] = start_time
+        self._last_update_ts: Optional[float] = start_time
+        self._active_monitoring_sec: float = 0.0
         self._blink_timestamps: Deque[float] = deque()
         self._bpm_history: Deque[Tuple[float, float]] = deque(maxlen=180)
         self._last_history_ts: Optional[float] = None
@@ -70,6 +73,19 @@ class WellnessMonitor:
         self._in_break: bool = False
         self._break_end_ts: Optional[float] = None
         self._breaks_completed: int = 0
+
+    def begin_active_window(self, timestamp: float) -> None:
+        """Start a fresh active sampling window after duty-cycle sleep or pause.
+
+        Preserves cumulative session blinks and active duration while resetting
+        the rolling BPM warmup so waking from camera sleep never triggers a
+        false low-blink-rate alert on frame 1.
+        """
+        if self._start_ts is None:
+            self._init_timers(timestamp)
+        self._window_start_ts = timestamp
+        self._last_update_ts = timestamp
+        self._blink_timestamps.clear()
 
     @property
     def bpm_history(self) -> Sequence[Tuple[float, float]]:
@@ -92,7 +108,15 @@ class WellnessMonitor:
             self.record_blink(timestamp)
 
         assert self._start_ts is not None
+        if self._window_start_ts is None:
+            self._window_start_ts = self._start_ts
+        if self._last_update_ts is not None:
+            dt = max(0.0, min(2.0, timestamp - self._last_update_ts))
+            self._active_monitoring_sec += dt
+        self._last_update_ts = timestamp
+
         elapsed = max(0.0, timestamp - self._start_ts)
+        window_elapsed = max(0.0, timestamp - self._window_start_ts)
 
         # Prune rolling BPM window
         window = max(1.0, self.config.bpm_window_sec)
@@ -100,13 +124,14 @@ class WellnessMonitor:
         while self._blink_timestamps and self._blink_timestamps[0] < cutoff:
             self._blink_timestamps.popleft()
 
-        effective_window = min(window, max(elapsed, 1.0))
-        if elapsed < 5.0:
+        effective_window = min(window, max(window_elapsed, 1.0))
+        if window_elapsed < 5.0:
             current_bpm = 0.0
         else:
             current_bpm = (len(self._blink_timestamps) / effective_window) * 60.0
 
-        avg_bpm = (self._total_blinks / elapsed) * 60.0 if elapsed >= 5.0 else 0.0
+        active_total = max(self._active_monitoring_sec, window_elapsed)
+        avg_bpm = (self._total_blinks / active_total) * 60.0 if active_total >= 5.0 else 0.0
         if current_bpm > self._max_bpm:
             self._max_bpm = current_bpm
 
@@ -119,9 +144,9 @@ class WellnessMonitor:
             self._last_history_ts = timestamp
             self._bpm_history.append((timestamp, round(current_bpm, 1)))
 
-        # Dry-eye / low blink rate alert
+        # Dry-eye / low blink rate alert requires sufficient active monitoring in the current window
         dry_eye_warning = (
-            elapsed >= self.config.low_bpm_warmup_sec
+            window_elapsed >= self.config.low_bpm_warmup_sec
             and current_bpm < self.config.low_bpm_threshold
         )
         dry_eye_triggered = False
@@ -152,6 +177,8 @@ class WellnessMonitor:
 
     def _init_timers(self, timestamp: float) -> None:
         self._start_ts = timestamp
+        self._window_start_ts = timestamp
+        self._last_update_ts = timestamp
         if self.config.enable_break_reminder and self.config.break_interval_sec > 0:
             self._next_break_ts = timestamp + self.config.break_interval_sec
         else:

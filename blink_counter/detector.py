@@ -110,6 +110,7 @@ class BlinkDetector:
         self._closure_min_ear: float = 1.0
         self._last_blink_ts: Optional[float] = None
         self._drowsy_active_for_closure: bool = False
+        self._warmup_until_ts: Optional[float] = None
 
         # Calibration tracking
         do_cal = self.config.auto_calibrate if recalibrate is None else recalibrate
@@ -127,6 +128,23 @@ class BlinkDetector:
         self._calibrating = True
         self._cal_start_ts = None
         self._cal_samples = []
+
+    def reset_transient_state(self, timestamp: Optional[float] = None, *, warmup_sec: float = 1.5) -> None:
+        """Clear transient eye-closure/smoothing state on resume or duty-cycle wake.
+
+        Prevents stale closure timestamps from triggering false drowsiness alerts
+        after camera sleep or pause, without clearing total blinks or calibration.
+        """
+        self._smoothed_ear = None
+        self._eyes_closed = False
+        self._closed_frame_count = 0
+        self._closure_start_ts = None
+        self._closure_min_ear = 1.0
+        self._drowsy_active_for_closure = False
+        self._last_ts = timestamp
+        self._warmup_until_ts: Optional[float] = (
+            timestamp + max(0.0, warmup_sec) if timestamp is not None else None
+        )
 
     @property
     def threshold(self) -> float:
@@ -227,8 +245,9 @@ class BlinkDetector:
         drowsy_triggered = False
         closure_duration_ms = 0.0
 
+        in_warmup = self._warmup_until_ts is not None and timestamp < self._warmup_until_ts
         if not self._eyes_closed:
-            if smoothed < close_thresh:
+            if not in_warmup and smoothed < close_thresh:
                 self._eyes_closed = True
                 self._closed_frame_count = 1
                 self._closure_start_ts = timestamp

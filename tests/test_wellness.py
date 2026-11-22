@@ -69,6 +69,33 @@ class TestWellnessMonitor(unittest.TestCase):
         self.assertTrue(s_done.break_status.break_completed)
         self.assertEqual(s_done.break_status.breaks_completed, 1)
 
+    def test_duty_cycle_wake_does_not_trigger_false_low_bpm(self) -> None:
+        cfg = WellnessConfig(
+            bpm_window_sec=60.0,
+            low_bpm_threshold=10.0,
+            low_bpm_warmup_sec=30.0,
+            enable_break_reminder=False,
+        )
+        monitor = WellnessMonitor(cfg)
+        # Active window 1: 15 blinks over 60 seconds -> healthy 15 BPM
+        monitor.update(0.0)
+        for i in range(1, 16):
+            monitor.update(i * 4.0, blink_occurred=True)
+
+        # Simulate 240s camera sleep, then wake up at t=300.0
+        monitor.begin_active_window(300.0)
+        snap_wake = monitor.update(301.0, blink_occurred=False)
+        self.assertFalse(snap_wake.dry_eye_warning)
+        self.assertFalse(snap_wake.dry_eye_triggered)
+        self.assertEqual(snap_wake.dry_eye_alerts, 0)
+        # Even 15s into new window with 0 blinks yet, still inside 30s warmup
+        snap_mid = monitor.update(315.0, blink_occurred=False)
+        self.assertFalse(snap_mid.dry_eye_warning)
+        # Only after 30s of active monitoring in the new window with 0 blinks should it alert
+        snap_late = monitor.update(331.0, blink_occurred=False)
+        self.assertTrue(snap_late.dry_eye_warning)
+        self.assertTrue(snap_late.dry_eye_triggered)
+
 
 if __name__ == "__main__":
     unittest.main()
