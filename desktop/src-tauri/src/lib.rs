@@ -1,3 +1,4 @@
+use serde::Serialize;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -5,6 +6,21 @@ use tauri::{
 };
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_updater::UpdaterExt;
+
+#[derive(Clone, Serialize)]
+struct UpdateInfo {
+    version: String,
+    current_version: String,
+    body: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+struct UpdateProgress {
+    downloaded: u64,
+    total: Option<u64>,
+    percent: Option<u8>,
+}
 
 fn show_main_window(app: &AppHandle, always_on_top: bool) {
     #[cfg(target_os = "macos")]
@@ -78,10 +94,72 @@ fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool, String> {
     Ok(manager.is_enabled().unwrap_or(enabled))
 }
 
+#[tauri::command]
+fn get_app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+#[tauri::command]
+async fn check_for_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let current = app.package_info().version.to_string();
+    match updater.check().await.map_err(|e| e.to_string())? {
+        Some(update) => Ok(Some(UpdateInfo {
+            version: update.version.clone(),
+            current_version: current,
+            body: update.body.clone(),
+        })),
+        None => Ok(None),
+    }
+}
+
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<bool, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    let Some(update) = updater.check().await.map_err(|e| e.to_string())? else {
+        return Ok(false);
+    };
+
+    let mut downloaded: u64 = 0;
+    let progress_app = app.clone();
+    let finish_app = app.clone();
+
+    update
+        .download_and_install(
+            move |chunk_length, content_length| {
+                downloaded += chunk_length as u64;
+                let percent = content_length.and_then(|total| {
+                    if total > 0 {
+                        Some(((downloaded.saturating_mul(100)) / total).min(100) as u8)
+                    } else {
+                        None
+                    }
+                });
+                let _ = progress_app.emit(
+                    "update-progress",
+                    UpdateProgress {
+                        downloaded,
+                        total: content_length,
+                        percent,
+                    },
+                );
+            },
+            move || {
+                let _ = finish_app.emit("update-installing", ());
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec!["--autostart"]),
@@ -91,10 +169,12 @@ pub fn run() {
                 MenuItem::with_id(app, "show", "Show Blink Counter", true, None::<&str>)?;
             let break_item =
                 MenuItem::with_id(app, "break_now", "Start 20s Eye Break", true, None::<&str>)?;
+            let update_item =
+                MenuItem::with_id(app, "check_updates", "Check for Updates", true, None::<&str>)?;
             let quit_item =
                 MenuItem::with_id(app, "quit", "Quit Blink Counter", true, None::<&str>)?;
 
-            let menu = Menu::with_items(app, &[&show_item, &break_item, &quit_item])?;
+            let menu = Menu::with_items(app, &[&show_item, &break_item, &update_item, &quit_item])?;
 
             let mut tray_builder = TrayIconBuilder::with_id("main-tray")
                 .menu(&menu)
@@ -107,6 +187,10 @@ pub fn run() {
                     "break_now" => {
                         show_main_window(app, false);
                         let _ = app.emit("tray-start-break", ());
+                    }
+                    "check_updates" => {
+                        show_main_window(app, false);
+                        let _ = app.emit("tray-check-updates", ());
                     }
                     "quit" => {
                         app.exit(0);
@@ -142,6 +226,25 @@ pub fn run() {
                 hide_main_to_tray(app.handle());
             }
 
+            // Silently check for signed updates in the background shortly after launch
+            let startup_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(5));
+                tauri::async_runtime::spawn(async move {
+                    if let Ok(updater) = startup_handle.updater() {
+                        if let Ok(Some(update)) = updater.check().await {
+                            let current = startup_handle.package_info().version.to_string();
+                            let info = UpdateInfo {
+                                version: update.version.clone(),
+                                current_version: current,
+                                body: update.body.clone(),
+                            };
+                            let _ = startup_handle.emit("update-available", info);
+                        }
+                    }
+                });
+            });
+
             Ok(())
         })
         .on_window_event(|window, event| match event {
@@ -165,6 +268,9 @@ pub fn run() {
             update_tray_tooltip,
             get_autostart,
             set_autostart,
+            get_app_version,
+            check_for_update,
+            install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Blink Counter desktop application");

@@ -106,6 +106,16 @@ const I18N = {
     autostartLabel: "Launch at login",
     popupAlerts: "Pop-up & system alerts",
     testAlert: "🔔 Test Pop-up & Sound",
+    checkUpdates: "🔄 Check for Updates",
+    updateNow: "Update & Restart",
+    updateLater: "Later",
+    updateAvailableTitle: "✨ New version v{ver} is available!",
+    updateAvailableDesc: "Current: v{cur} — Click to download, install, and restart automatically.",
+    updateChecking: "Checking for updates…",
+    updateUpToDate: "✅ You are on the latest version (v{ver}).",
+    updateDownloading: "Downloading update… {pct}%",
+    updateInstalling: "Installing update & restarting…",
+    updateError: "Update check failed: {err}",
     modalDismiss: "Got it",
     popupDryEyeTitle: "Blink Reminder — Low Blink Rate",
     popupDryEyeBody: "Your blink rate dropped to {bpm} blinks/min (healthy: 15–20). Please blink gently a few times to keep your eyes moist.",
@@ -210,6 +220,16 @@ const I18N = {
     autostartLabel: "开机自启动",
     popupAlerts: "弹窗与系统通知提醒",
     testAlert: "🔔 测试弹窗与音效",
+    checkUpdates: "🔄 检查更新",
+    updateNow: "立即更新并重启",
+    updateLater: "稍后",
+    updateAvailableTitle: "✨ 发现新版本 v{ver}！",
+    updateAvailableDesc: "当前版本 v{cur} — 点击即可自动下载安装并重启生效，无需手动下载。",
+    updateChecking: "正在检查更新…",
+    updateUpToDate: "✅ 当前已是最新版本 (v{ver})。",
+    updateDownloading: "正在下载更新… {pct}%",
+    updateInstalling: "正在安装更新并自动重启…",
+    updateError: "检查更新失败：{err}",
     modalDismiss: "知道了",
     popupDryEyeTitle: "护眼提醒：眨眼频率过低",
     popupDryEyeBody: "当前眨眼频率仅 {bpm} 次/分（健康参考 15–20 次/分）。请有意识地轻轻多眨几次眼，缓解眼干疲劳。",
@@ -314,6 +334,16 @@ const I18N = {
     autostartLabel: "ログイン時に自動起動",
     popupAlerts: "ポップアップ＆システム通知",
     testAlert: "🔔 ポップアップ＆音テスト",
+    checkUpdates: "🔄 アップデート確認",
+    updateNow: "今すぐ更新して再起動",
+    updateLater: "後で",
+    updateAvailableTitle: "✨ 新バージョン v{ver} が利用可能です！",
+    updateAvailableDesc: "現在 v{cur} — クリックで自動ダウンロード＆再起動します。",
+    updateChecking: "アップデートを確認中…",
+    updateUpToDate: "✅ 最新バージョンです (v{ver})。",
+    updateDownloading: "ダウンロード中… {pct}%",
+    updateInstalling: "インストールして再起動中…",
+    updateError: "更新確認に失敗しました: {err}",
     modalDismiss: "OK",
     popupDryEyeTitle: "まばたきリマインダー（頻度低下）",
     popupDryEyeBody: "現在のまばたき頻度は {bpm} 回/分です（目安 15–20）。ドライアイ予防のためゆっくり数回まばたきしましょう。",
@@ -418,6 +448,16 @@ const I18N = {
     autostartLabel: "Iniciar al encender",
     popupAlerts: "Ventanas emergentes y notificaciones",
     testAlert: "🔔 Probar Aviso y Sonido",
+    checkUpdates: "🔄 Buscar Actualizaciones",
+    updateNow: "Actualizar y Reiniciar",
+    updateLater: "Más tarde",
+    updateAvailableTitle: "✨ ¡Nueva versión v{ver} disponible!",
+    updateAvailableDesc: "Actual: v{cur} — Haz clic para descargar, instalar y reiniciar automáticamente.",
+    updateChecking: "Buscando actualizaciones…",
+    updateUpToDate: "✅ Ya tienes la última versión (v{ver}).",
+    updateDownloading: "Descargando actualización… {pct}%",
+    updateInstalling: "Instalando y reiniciando…",
+    updateError: "Error al buscar actualizaciones: {err}",
     modalDismiss: "Entendido",
     popupDryEyeTitle: "Recordatorio: Parpadeo Bajo",
     popupDryEyeBody: "Tu frecuencia bajó a {bpm} parpadeos/min (normal: 15–20). Parpadea suavemente varias veces para lubricar tus ojos.",
@@ -1655,12 +1695,59 @@ videoWrapper.classList.add("mirrored");
 applyStaticTranslations();
 drawBpmChart();
 
-// Progressive Web App (PWA) install support & Tauri Desktop Tray / Autostart controls
+// Progressive Web App (PWA) install support & Tauri Desktop Tray / Autostart / Updater controls
 const installAppBtn = document.getElementById("installAppBtn");
 const minimizeTrayBtn = document.getElementById("minimizeTrayBtn");
 const autostartRow = document.getElementById("autostartRow");
 const autostartToggle = document.getElementById("autostartToggle");
+const checkUpdateBtn = document.getElementById("checkUpdateBtn");
+const updateStatusText = document.getElementById("updateStatusText");
+const updateBanner = document.getElementById("updateBanner");
+const updateBannerTitle = document.getElementById("updateBannerTitle");
+const updateBannerDesc = document.getElementById("updateBannerDesc");
+const installUpdateBtn = document.getElementById("installUpdateBtn");
+const dismissUpdateBtn = document.getElementById("dismissUpdateBtn");
 let deferredInstallPrompt = null;
+
+function showUpdateBanner(info) {
+  if (!updateBanner || !info) return;
+  updateBannerTitle.textContent = t("updateAvailableTitle", { ver: info.version });
+  updateBannerDesc.textContent = t("updateAvailableDesc", { cur: info.current_version });
+  installUpdateBtn.disabled = false;
+  installUpdateBtn.textContent = t("updateNow");
+  updateBanner.classList.remove("hidden");
+}
+
+function setUpdateStatus(msg) {
+  if (!updateStatusText) return;
+  if (!msg) {
+    updateStatusText.classList.add("hidden");
+    updateStatusText.textContent = "";
+    return;
+  }
+  updateStatusText.textContent = msg;
+  updateStatusText.classList.remove("hidden");
+}
+
+async function runManualUpdateCheck() {
+  if (!isTauriDesktop) return;
+  if (checkUpdateBtn) checkUpdateBtn.disabled = true;
+  setUpdateStatus(t("updateChecking"));
+  try {
+    const info = await tauriCore.invoke("check_for_update");
+    if (info) {
+      setUpdateStatus("");
+      showUpdateBanner(info);
+    } else {
+      const curVer = await tauriCore.invoke("get_app_version").catch(() => "");
+      setUpdateStatus(t("updateUpToDate", { ver: curVer }));
+    }
+  } catch (err) {
+    setUpdateStatus(t("updateError", { err: String(err) }));
+  } finally {
+    if (checkUpdateBtn) checkUpdateBtn.disabled = false;
+  }
+}
 
 if (isTauriDesktop) {
   if (minimizeTrayBtn) {
@@ -1689,10 +1776,54 @@ if (isTauriDesktop) {
         });
     });
   }
+  if (checkUpdateBtn) {
+    checkUpdateBtn.classList.remove("hidden");
+    checkUpdateBtn.addEventListener("click", runManualUpdateCheck);
+  }
+  if (installUpdateBtn) {
+    installUpdateBtn.addEventListener("click", async () => {
+      installUpdateBtn.disabled = true;
+      updateBannerDesc.textContent = t("updateDownloading", { pct: 0 });
+      try {
+        await tauriCore.invoke("install_update");
+      } catch (err) {
+        installUpdateBtn.disabled = false;
+        setUpdateStatus(t("updateError", { err: String(err) }));
+      }
+    });
+  }
+  if (dismissUpdateBtn) {
+    dismissUpdateBtn.addEventListener("click", () => {
+      updateBanner.classList.add("hidden");
+    });
+  }
   if (tauriEvent) {
     tauriEvent
       .listen("tray-start-break", () => {
         takeBreakNowBtn.click();
+      })
+      .catch(() => {});
+    tauriEvent
+      .listen("tray-check-updates", () => {
+        runManualUpdateCheck();
+      })
+      .catch(() => {});
+    tauriEvent
+      .listen("update-available", (ev) => {
+        showUpdateBanner(ev.payload);
+      })
+      .catch(() => {});
+    tauriEvent
+      .listen("update-progress", (ev) => {
+        const pct = ev.payload?.percent;
+        if (typeof pct === "number") {
+          updateBannerDesc.textContent = t("updateDownloading", { pct });
+        }
+      })
+      .catch(() => {});
+    tauriEvent
+      .listen("update-installing", () => {
+        updateBannerDesc.textContent = t("updateInstalling");
       })
       .catch(() => {});
   }

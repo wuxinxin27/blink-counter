@@ -26,6 +26,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
@@ -39,6 +40,14 @@
     "longDescription": "Blink Counter uses on-device vision to monitor your blink frequency in real time, remind you to prevent dry eyes, and schedule 20-20-20 far-gaze eye breaks — 100% locally and free.",
     "macOS": {
       "minimumSystemVersion": "11.0"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXkgQTFFQkRCMDc0MTA0MjVGRQpSV1QrSlFSQkI5dnJvVjlQUlRRT0FnYlpFdjA0OW5CbmNIbDYzTXc2TUlwQUhKMnFiNHhsUTBmMAo=",
+      "endpoints": [
+        "https://github.com/wuxinxin27/blink-counter/releases/latest/download/latest.json"
+      ]
     }
   }
 }
