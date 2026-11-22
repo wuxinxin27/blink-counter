@@ -38,6 +38,17 @@
       </div>
     </header>
 
+    <div id="updateBanner" class="update-banner hidden" role="status" aria-live="polite">
+      <div class="update-banner-text">
+        <strong id="updateBannerTitle">New update available</strong>
+        <span id="updateBannerDesc" class="muted"></span>
+      </div>
+      <div class="update-banner-actions">
+        <button id="installUpdateBtn" class="btn btn-primary btn-sm" data-i18n="updateNow">Update &amp; Restart</button>
+        <button id="dismissUpdateBtn" class="btn btn-outline btn-sm" data-i18n="updateLater">Later</button>
+      </div>
+    </div>
+
     <div id="alertBanner" class="alert-banner hidden" role="status" aria-live="polite"></div>
 
     <main class="main-grid">
@@ -212,7 +223,9 @@
           </div>
           <div class="alert-actions-row">
             <button id="testAlertBtn" class="btn btn-outline btn-sm" data-i18n="testAlert">🔔 Test Pop-up &amp; Sound</button>
+            <button id="checkUpdateBtn" class="btn btn-outline btn-sm hidden" data-i18n="checkUpdates">🔄 Check for Updates</button>
           </div>
+          <p id="updateStatusText" class="metric-sub update-status hidden"></p>
         </section>
 
         <section class="card log-card">
